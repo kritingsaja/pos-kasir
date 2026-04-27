@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllProducts, searchProducts, addProduct, updateProduct, deleteProduct } from '@/lib/db';
+import { getAllProducts, searchProducts, addProduct, updateProduct, deleteProduct, getAllProductsSortedByPopularity } from '@/lib/db';
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
