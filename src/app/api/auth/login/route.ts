@@ -57,8 +57,11 @@ export async function POST(req: NextRequest) {
         });
 
         return response;
-    } catch (error) {
+    } catch (error: any) {
         console.error('Login error:', error);
-        return NextResponse.json({ success: false, error: 'Terjadi kesalahan pada server' }, { status: 500 });
+        return NextResponse.json({ 
+            success: false, 
+            error: 'ERROR: ' + (error.message || 'Unknown Server Error') 
+        }, { status: 500 });
     }
 }
