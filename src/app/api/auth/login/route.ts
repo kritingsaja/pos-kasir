@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Username tidak ditemukan' }, { status: 401 });
         }
 
-        const passwordMatch = await bcrypt.compare(password, user.password);
+        const passwordMatch = await bcrypt.compare(password, user.password as string);
 
         if (!passwordMatch) {
             return NextResponse.json({ success: false, error: 'Password salah' }, { status: 401 });
