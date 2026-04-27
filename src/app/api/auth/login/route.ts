@@ -13,13 +13,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, error: 'Username dan password harus diisi' }, { status: 400 });
         }
 
-        const user = await getUserByUsername(username);
+        const user = (await getUserByUsername(username)) as any;
 
-        if (!user) {
+        if (!user || !user.password) {
             return NextResponse.json({ success: false, error: 'Username tidak ditemukan' }, { status: 401 });
         }
 
-        const passwordMatch = await bcrypt.compare(password, user.password as string);
+        const passwordMatch = await bcrypt.compare(password, String(user.password));
 
         if (!passwordMatch) {
             return NextResponse.json({ success: false, error: 'Password salah' }, { status: 401 });
@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
         const secret = new TextEncoder().encode(JWT_SECRET);
         const alg = 'HS256';
 
-        const jwt = await new SignJWT({ id: user.id, username: user.username, role: user.role })
+        const jwt = await new SignJWT({ 
+            id: user.id, 
+            username: user.username, 
+            role: user.role 
+        })
             .setProtectedHeader({ alg })
             .setIssuedAt()
             .setExpirationTime('24h')
