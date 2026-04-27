@@ -2,7 +2,13 @@ import { createClient, Client } from '@libsql/client';
 import path from 'path';
 
 const isProd = process.env.NODE_ENV === 'production';
-const url = process.env.TURSO_URL || process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL || `file:${path.join(process.cwd(), 'data', 'pos.db')}`;
+const url = process.env.TURSO_URL || process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL;
+
+if (!url && isProd) {
+    throw new Error("DATABASE ERROR: Turso URL tidak ditemukan di Environment Variables Vercel. Pastikan TURSO_URL sudah disetting.");
+}
+
+const finalUrl = url || `file:${path.join(process.cwd(), 'data', 'pos.db')}`;
 const authToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
 
 let client: Client | null = null;
@@ -11,7 +17,7 @@ let initialized = false;
 export function getDb(): Client {
   if (!client) {
     client = createClient({
-      url: url,
+      url: finalUrl,
       authToken: authToken,
     });
   }
@@ -27,7 +33,7 @@ export async function ensureDb() {
 
 export async function initializeDatabase() {
   const db = getDb();
-  console.log("Initializing database schema...");
+  console.log("Initializing database schema on:", finalUrl);
   
   try {
     // 1. Create Tables
