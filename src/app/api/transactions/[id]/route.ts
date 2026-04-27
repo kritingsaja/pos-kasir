@@ -8,7 +8,7 @@ export async function DELETE(
     try {
         const { id } = await params;
         if (!id) return NextResponse.json({ success: false, error: 'ID wajib diisi' }, { status: 400 });
-        deleteTransaction(id);
+        await deleteTransaction(id);
         return NextResponse.json({ success: true, message: 'Transaksi berhasil dihapus' });
     } catch (error) {
         return NextResponse.json({ success: false, error: 'Gagal menghapus transaksi' }, { status: 500 });

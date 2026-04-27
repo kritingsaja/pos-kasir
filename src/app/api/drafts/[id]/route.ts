@@ -12,7 +12,7 @@ export async function DELETE(
             return NextResponse.json({ success: false, error: 'Invalid ID' }, { status: 400 });
         }
 
-        const result = deleteDraft(id);
+        const result = await deleteDraft(id);
         return NextResponse.json({ success: true, data: result });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });

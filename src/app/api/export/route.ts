@@ -7,7 +7,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { tanggal, start, end } = body;
 
-        const spreadsheetId = getSetting('spreadsheet_id');
+        const spreadsheetId = await getSetting('spreadsheet_id');
         if (!spreadsheetId) {
             return NextResponse.json({
                 success: false,
@@ -17,9 +17,9 @@ export async function POST(request: Request) {
 
         let transactions;
         if (start && end) {
-            transactions = getTransactionsRange(start, end);
+            transactions = await getTransactionsRange(start, end);
         } else if (tanggal) {
-            transactions = getTransactionsByDate(tanggal);
+            transactions = await getTransactionsByDate(tanggal);
         } else {
             return NextResponse.json({ success: false, error: 'Tanggal or Start/End is required' }, { status: 400 });
         }

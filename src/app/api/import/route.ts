@@ -80,36 +80,40 @@ export async function POST(request: Request) {
         }
 
         const db = getDb();
+        const ops: any[] = [];
 
-        const importProcess = db.transaction(() => {
-            if (categories && Array.isArray(categories)) {
-                const insertCat = db.prepare('INSERT OR IGNORE INTO categories (nama) VALUES (?)');
-                for (const cat of categories) {
-                    if (cat.nama) insertCat.run(cat.nama);
-                }
-            }
-
-            if (products && Array.isArray(products)) {
-                const insertProd = db.prepare(`
-                    INSERT OR REPLACE INTO products (kode_barang, nama_barang, harga_jual, diskon, tipe_diskon, kategori, stok)
-                    VALUES (@kode_barang, @nama_barang, @harga_jual, @diskon, @tipe_diskon, @kategori, @stok)
-                `);
-
-                for (const prod of products) {
-                    insertProd.run({
-                        kode_barang: prod.kode_barang,
-                        nama_barang: prod.nama_barang,
-                        harga_jual: prod.harga_jual || 0,
-                        diskon: prod.diskon || 0,
-                        tipe_diskon: prod.tipe_diskon || 1,
-                        kategori: prod.kategori || '',
-                        stok: prod.stok || 0
+        if (categories && Array.isArray(categories)) {
+            for (const cat of categories) {
+                if (cat.nama) {
+                    ops.push({
+                        sql: 'INSERT OR IGNORE INTO categories (nama) VALUES (?)',
+                        args: [cat.nama]
                     });
                 }
             }
-        });
+        }
 
-        importProcess();
+        if (products && Array.isArray(products)) {
+            for (const prod of products) {
+                ops.push({
+                    sql: `INSERT OR REPLACE INTO products (kode_barang, nama_barang, harga_jual, diskon, tipe_diskon, kategori, stok)
+                          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    args: [
+                        prod.kode_barang,
+                        prod.nama_barang,
+                        prod.harga_jual || 0,
+                        prod.diskon || 0,
+                        prod.tipe_diskon || 1,
+                        prod.kategori || '',
+                        prod.stok || 0
+                    ]
+                });
+            }
+        }
+
+        if (ops.length > 0) {
+            await db.batch(ops);
+        }
         return NextResponse.json({
             success: true,
             message: 'Data berhasil diimport',
