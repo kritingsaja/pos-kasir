@@ -27,100 +27,104 @@ export async function ensureDb() {
 
 export async function initializeDatabase() {
   const db = getDb();
+  console.log("Checking database connection to:", url);
   
-  // Separate multiple statements for compatibility if needed, 
-  // though Turso supports multi-statement strings in execute() sometimes, 
-  // it's safer to use batch or multiple calls for migrations.
-  const schema = [
-    `CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      kode_barang TEXT UNIQUE NOT NULL,
-      nama_barang TEXT NOT NULL,
-      harga_jual INTEGER NOT NULL DEFAULT 0,
-      diskon INTEGER NOT NULL DEFAULT 0,
-      tipe_diskon INTEGER NOT NULL DEFAULT 1,
-      kategori TEXT DEFAULT '',
-      stok INTEGER DEFAULT 0,
-      aktif INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now','localtime')),
-      updated_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS transactions (
-      id TEXT PRIMARY KEY,
-      tanggal TEXT NOT NULL,
-      waktu TEXT NOT NULL,
-      items TEXT NOT NULL,
-      subtotal INTEGER NOT NULL DEFAULT 0,
-      diskon_total INTEGER NOT NULL DEFAULT 0,
-      total INTEGER NOT NULL DEFAULT 0,
-      bayar INTEGER NOT NULL DEFAULT 0,
-      kembalian INTEGER NOT NULL DEFAULT 0,
-      metode_bayar TEXT NOT NULL DEFAULT 'tunai',
-      kasir TEXT DEFAULT 'Admin',
-      nama_pelanggan TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    )`,
-    `CREATE TABLE IF NOT EXISTS drafts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nama_draft TEXT NOT NULL,
-      items TEXT NOT NULL,
-      subtotal INTEGER NOT NULL DEFAULT 0,
-      diskon_total INTEGER NOT NULL DEFAULT 0,
-      total INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now','localtime')),
-      updated_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('Admin', 'Kasir')),
-      created_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nama TEXT UNIQUE NOT NULL,
-      created_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS raw_materials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nama TEXT NOT NULL,
-      satuan TEXT NOT NULL,
-      stok_awal REAL DEFAULT 0,
-      min_stok REAL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now','localtime')),
-      updated_at TEXT DEFAULT (datetime('now','localtime'))
-    )`,
-    `CREATE TABLE IF NOT EXISTS product_materials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      product_id INTEGER NOT NULL,
-      material_id INTEGER NOT NULL,
-      qty_used REAL NOT NULL,
-      FOREIGN KEY (product_id) REFERENCES products(id),
-      FOREIGN KEY (material_id) REFERENCES raw_materials(id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS restock_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      material_id INTEGER NOT NULL,
-      jumlah REAL NOT NULL,
-      catatan TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now','localtime')),
-      FOREIGN KEY (material_id) REFERENCES raw_materials(id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_transactions_tanggal ON transactions(tanggal)`
-  ];
-
-  for (const sql of schema) {
-    await db.execute(sql);
+  if (!process.env.TURSO_URL && isProd) {
+    console.error("CRITICAL: TURSO_URL is missing in production environment!");
   }
 
-  // Migration: Add columns if they don't exist
   try {
-    const tableInfo = await db.execute("PRAGMA table_info(transactions)");
+    const schema = [
+      `CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kode_barang TEXT UNIQUE NOT NULL,
+        nama_barang TEXT NOT NULL,
+        harga_jual INTEGER NOT NULL DEFAULT 0,
+        diskon INTEGER NOT NULL DEFAULT 0,
+        tipe_diskon INTEGER NOT NULL DEFAULT 1,
+        kategori TEXT DEFAULT '',
+        stok INTEGER DEFAULT 0,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        tanggal TEXT NOT NULL,
+        waktu TEXT NOT NULL,
+        items TEXT NOT NULL,
+        subtotal INTEGER NOT NULL DEFAULT 0,
+        diskon_total INTEGER NOT NULL DEFAULT 0,
+        total INTEGER NOT NULL DEFAULT 0,
+        bayar INTEGER NOT NULL DEFAULT 0,
+        kembalian INTEGER NOT NULL DEFAULT 0,
+        metode_bayar TEXT NOT NULL DEFAULT 'tunai',
+        kasir TEXT DEFAULT 'Admin',
+        nama_pelanggan TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS drafts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama_draft TEXT NOT NULL,
+        items TEXT NOT NULL,
+        subtotal INTEGER NOT NULL DEFAULT 0,
+        diskon_total INTEGER NOT NULL DEFAULT 0,
+        total INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL CHECK(role IN ('Admin', 'Kasir')),
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT UNIQUE NOT NULL,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS raw_materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nama TEXT NOT NULL,
+        satuan TEXT NOT NULL,
+        stok_awal REAL DEFAULT 0,
+        min_stok REAL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        updated_at TEXT DEFAULT (datetime('now','localtime'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS product_materials (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        material_id INTEGER NOT NULL,
+        qty_used REAL NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products(id),
+        FOREIGN KEY (material_id) REFERENCES raw_materials(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS restock_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        material_id INTEGER NOT NULL,
+        jumlah REAL NOT NULL,
+        catatan TEXT DEFAULT '',
+        created_at TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (material_id) REFERENCES raw_materials(id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_transactions_tanggal ON transactions(tanggal)`
+    ];
+
+    console.log("Creating tables...");
+    for (const sql of schema) {
+      await db.execute(sql);
+    }
+    console.log("Schema initialized successfully.");
+
+    // Migration: Add columns if they don't exist
+    const tableInfo = await db.execute("SELECT name FROM pragma_table_info('transactions')");
     const cols = tableInfo.rows.map(r => r.name);
     if (!cols.includes('kasir')) {
       await db.execute("ALTER TABLE transactions ADD COLUMN kasir TEXT DEFAULT 'Admin'");
@@ -128,46 +132,48 @@ export async function initializeDatabase() {
     if (!cols.includes('nama_pelanggan')) {
       await db.execute("ALTER TABLE transactions ADD COLUMN nama_pelanggan TEXT DEFAULT ''");
     }
-  } catch (e) {
-    console.error("Migration error:", e);
-  }
 
-  // Default values
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-    args: ['nama_toko', 'TOKO SAYA']
-  });
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-    args: ['alamat_toko', 'Jl. Contoh No. 123']
-  });
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-    args: ['telepon_toko', '08123456789']
-  });
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-    args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!']
-  });
+    // Default values
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+      args: ['nama_toko', 'TOKO SAYA']
+    });
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+      args: ['alamat_toko', 'Jl. Contoh No. 123']
+    });
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+      args: ['telepon_toko', '08123456789']
+    });
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+      args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!']
+    });
 
-  // Default users
-  const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-    args: ['admin', defaultPassword, 'Admin']
-  });
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-    args: ['kasir', defaultPassword, 'Kasir']
-  });
+    // Default users
+    const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
+      args: ['admin', defaultPassword, 'Admin']
+    });
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
+      args: ['kasir', defaultPassword, 'Kasir']
+    });
 
-  // Default categories
-  const countCats = await db.execute('SELECT COUNT(*) as c FROM categories');
-  if (Number(countCats.rows[0]?.c) === 0) {
-    const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
-    for (const cat of cats) {
-      await db.execute({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] });
+    // Default categories
+    const countCats = await db.execute('SELECT COUNT(*) as c FROM categories');
+    if (Number(countCats.rows[0]?.c) === 0) {
+      const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
+      for (const cat of cats) {
+        await db.execute({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] });
+      }
     }
+    console.log("Database seeded successfully.");
+  } catch (error) {
+    console.error("DATABASE INIT ERROR:", error);
+    throw error;
   }
 }
 
