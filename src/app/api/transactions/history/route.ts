@@ -24,13 +24,13 @@ export async function GET() {
 
         const db = getDb();
 
-        // Fetch last 50 transactions, ordered by newest first
-        const transactions = db.prepare(`
+        const transactionsRes = await db.execute(`
             SELECT id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan, created_at 
             FROM transactions 
             ORDER BY created_at DESC 
             LIMIT 50
-        `).all();
+        `);
+        const transactions = transactionsRes.rows;
 
         // Parse items JSON for each transaction and map fields for frontend
         const fullTransactions = transactions.map((trx: any) => {
