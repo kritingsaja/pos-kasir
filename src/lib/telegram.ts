@@ -2,7 +2,7 @@ import { getAllSettings } from './db';
 import { getMaterialsWithStock } from './materials-logic';
 
 export async function sendTelegramMessage(text: string) {
-  const settings = getAllSettings();
+  const settings = await getAllSettings();
   const token = settings.telegram_bot_token;
   const chatId = settings.telegram_chat_id;
 
@@ -31,7 +31,7 @@ export async function sendTelegramMessage(text: string) {
 }
 
 export async function checkStockAndNotify() {
-  const materials = getMaterialsWithStock();
+  const materials = await getMaterialsWithStock();
   const warnings = materials.filter((m: any) => m.status === 'warning');
 
   let message = `<b>📢 LAPORAN STOK HARIAN</b>\n`;
