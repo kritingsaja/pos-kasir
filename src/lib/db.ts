@@ -285,7 +285,7 @@ export async function updateProduct(id: number, product: any) {
   
   return await db.execute({
     sql: `UPDATE products SET ${fields}, updated_at = datetime('now','localtime') WHERE id = ?`,
-    args: args
+    args: args as any[]
   });
 }
 
