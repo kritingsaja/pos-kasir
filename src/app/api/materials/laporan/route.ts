@@ -24,7 +24,7 @@ export async function GET(request: Request) {
           const productId = item.product_id || item.id;
           if (!productId) continue;
           
-          const recipe = await getProductRecipe(Number(productId));
+          const recipe = (await getProductRecipe(Number(productId))) as any[];
           for (const r of recipe) {
             if (!dailyUsage[r.material_id]) dailyUsage[r.material_id] = 0;
             dailyUsage[r.material_id] += (Number(item.qty) * Number(r.qty_used));
