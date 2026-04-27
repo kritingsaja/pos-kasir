@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>POS Kasir Emergency Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+        h1 { color: #333; margin-bottom: 20px; }
+        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; text-decoration: none; border-radius: 10px; font-size: 18px; font-weight: bold; }
+        .btn:hover { transform: scale(1.02); box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3); }
+        .status { padding: 15px; border-radius: 10px; margin: 20px 0; }
+        .online { background: #d4edda; color: #155724; }
+        .offline { background: #f8d7da; color: #721c24; }
+        .qrcode { margin: 20px auto; }
+        .info { background: #e3f2fd; padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 POS Kasir Emergency Access</h1>
+        
+        <div class="status" id="status">Checking server status...</div>
+        
+        <div class="info">
+            <strong>Server Time:</strong> <span id="time"></span><br>
+            <strong>Connection:</strong> <span id="connection"></span><br>
+            <strong>API Status:</strong> <span id="api"></span>
+        </div>
+        
+        <a href="/" class="btn">🏠 Go to Main Dashboard</a>
+        <a href="/test.html" class="btn">🔧 Test Page</a>
+        <a href="/api/products" class="btn">📦 Products API</a>
+        
+        <div class="qrcode" id="qrcode"></div>
+        
+        <p style="margin-top: 20px; color: #666; font-size: 14px;">
+            If you can't access, try:<br>
+            1. Check internet connection<br>
+            2. Try different browser<br>
+            3. Contact administrator
+        </p>
+    </div>
+    
+    <script>
+        // Update time
+        document.getElementById('time').textContent = new Date().toLocaleString();
+        
+        // Test connection
+        async function testConnection() {
+            const statusDiv = document.getElementById('status');
+            const connectionSpan = document.getElementById('connection');
+            const apiSpan = document.getElementById('api');
+            
+            try {
+                // Test basic connection
+                const response = await fetch('/');
+                if (response.ok) {
+                    connectionSpan.textContent = '✅ Connected';
+                    connectionSpan.style.color = 'green';
+                    
+                    // Test API
+                    const apiResponse = await fetch('/api/products');
+                    if (apiResponse.ok) {
+                        apiSpan.textContent = '✅ Working';
+                        apiSpan.style.color = 'green';
+                        statusDiv.className = 'status online';
+                        statusDiv.innerHTML = '✅ SERVER ONLINE - All systems operational';
+                    } else {
+                        apiSpan.textContent = '❌ Error';
+                        apiSpan.style.color = 'red';
+                        statusDiv.className = 'status offline';
+                        statusDiv.innerHTML = '⚠️ API Error - Frontend working but API failed';
+                    }
+                } else {
+                    connectionSpan.textContent = '❌ Failed';
+                    connectionSpan.style.color = 'red';
+                    statusDiv.className = 'status offline';
+                    statusDiv.innerHTML = '❌ SERVER OFFLINE - Cannot connect';
+                }
+            } catch (error) {
+                connectionSpan.textContent = '❌ No connection';
+                connectionSpan.style.color = 'red';
+                statusDiv.className = 'status offline';
+                statusDiv.innerHTML = '❌ NETWORK ERROR - Check server status';
+            }
+        }
+        
+        // Generate QR code
+        const qrUrl = window.location.origin;
+        document.getElementById('qrcode').innerHTML = 
+            `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}" alt="QR Code">`;
+        
+        // Run tests
+        testConnection();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(testConnection, 10000);
+    </script>
+</body>
+</html>

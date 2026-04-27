@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Kasir - T3ACO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .card {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid #e2e8f0;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #4f46e5;
+            margin-bottom: 15px;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            font-size: 24px;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+            text-align: center;
+        }
+        
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .api-status {
+            background: #dcfce7;
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .login-form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #475569;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 25px;
+            color: #64748b;
+            border-top: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                border-radius: 15px;
+                margin: 10px;
+            }
+            
+            .header {
+                padding: 25px 20px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .btn {
+                width: 100%;
+                margin: 5px 0;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-cash-register"></i> POS Kasir T3ACO</h1>
+            <p>Sistem Point of Sale Modern - Akses dari Mobile</p>
+        </div>
+        
+        <div class="content">
+            <div class="api-status">
+                <div class="status-indicator"></div>
+                <div>
+                    <strong>API Status: Online</strong>
+                    <p>Server berjalan di port 3000</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-sign-in-alt"></i> Login Kasir</h2>
+                <div class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" placeholder="Masukkan username" value="admin">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="Masukkan password" value="admin123">
+                    </div>
+                    <button class="btn" onclick="login()">
+                        <i class="fas fa-sign-in-alt"></i> Login ke Dashboard
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-rocket"></i> Quick Access</h2>
+                <p>Akses cepat ke fitur POS:</p>
+                <div class="btn-group">
+                    <a href="/api/products" class="btn" target="_blank">
+                        <i class="fas fa-boxes"></i> Produk API
+                    </a>
+                    <a href="/api/transactions" class="btn btn-secondary" target="_blank">
+                        <i class="fas fa-receipt"></i> Transaksi API
+                    </a>
+                    <button class="btn btn-danger" onclick="testAPI()">
+                        <i class="fas fa-vial"></i> Test API
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-mobile-alt"></i> Mobile Features</h2>
+                <p>Fitur yang tersedia untuk mobile:</p>
+                <div class="btn-group">
+                    <button class="btn" onclick="showProducts()">
+                        <i class="fas fa-list"></i> Lihat Produk
+                    </button>
+                    <button class="btn btn-secondary" onclick="addProduct()">
+                        <i class="fas fa-plus"></i> Tambah Produk
+                    </button>
+                    <button class="btn" onclick="createTransaction()">
+                        <i class="fas fa-shopping-cart"></i> Transaksi Baru
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>POS Kasir T3ACO &copy; 2026 | Powered by Node.js + SQLite | Access via: <strong>pos.teacoxplus.cloud</strong></p>
+            <p style="margin-top: 10px; font-size: 12px;">
+                <i class="fas fa-server"></i> Server: vps.teaco.id | 
+                <i class="fas fa-database"></i> Database: SQLite | 
+                <i class="fas fa-bolt"></i> Process: PM2
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`Login berhasil! Selamat datang ${data.user.username}`);
+                    // Redirect to dashboard or show more features
+                    showDashboard();
+                } else {
+                    alert(`Login gagal: ${data.error}`);
+                }
+            } catch (error) {
+                alert('Error: Tidak bisa connect ke server');
+            }
+        }
+        
+        async function testAPI() {
+            try {
+                const response = await fetch('/api/products');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`✅ API berjalan! ${data.length} produk ditemukan.`);
+                } else {
+                    alert('❌ API error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Tidak bisa connect ke API');
+            }
+        }
+        
+        function showProducts() {
+            window.open('/api/products', '_blank');
+        }
+        
+        function addProduct() {
+            const name = prompt('Nama produk:');
+            if (!name) return;
+            
+            const price = prompt('Harga:');
+            const stock = prompt('Stok:');
+            
+            fetch('/api/products', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name,
+                    price: parseFloat(price),
+                    stock: parseInt(stock),
+                    category: 'Umum'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(`✅ Produk "${data.name}" berhasil ditambahkan!`);
+            })
+            .catch(error => {
+                alert('❌ Error menambah produk');
+            });
+        }
+        
+        function createTransaction() {
+            alert('Fitur transaksi akan dibuka di halaman baru...');
+            // In real implementation, open transaction page
+        }
+        
+        function showDashboard() {
+            // Create simple dashboard
+            const dashboard = `
+                <div class="card">
+                    <h2><i class="fas fa-tachometer-alt"></i> Dashboard Kasir</h2>
+                    <p>Selamat datang di dashboard POS!</p>
+                    <div class="btn-group">
+                        <button class="btn" onclick="window.location.reload()">
+                            <i class="fas fa-home"></i> Kembali ke Home
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.querySelector('.content').innerHTML = dashboard + document.querySelector('.content').innerHTML;
+        }
+        
+        // Test API on load
+        window.addEventListener('load', () => {
+            fetch('/api/products')
+                .then(response => {
+                    const statusEl = document.querySelector('.api-status strong');
+                    if (response.ok) {
+                        statusEl.innerHTML = 'API Status: <span style="color:#10b981">Online</span>';
+                    } else {
+                        statusEl.innerHTML = 'API Status: <span style="color:#ef4444">Error</span>';
+                    }
+                })
+                .catch(() => {
+                    document.querySelector('.api-status strong').innerHTML = 
+                        'API Status: <span style="color:#ef4444">Offline</span>';
+                });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>POS Kasir Test Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .status { padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .online { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .offline { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .btn { display: inline-block; padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
+        .btn:hover { background: #0056b3; }
+        .info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 POS Kasir Test Page</h1>
+        
+        <div class="info">
+            <strong>Server IP:</strong> <span id="server-ip">Loading...</span><br>
+            <strong>Access Time:</strong> <span id="access-time"></span>
+        </div>
+        
+        <h2>Status Check</h2>
+        <div class="status" id="api-status">Checking API status...</div>
+        <div class="status" id="db-status">Checking database status...</div>
+        
+        <h2>Quick Links</h2>
+        <a href="/" class="btn">🏠 Main Dashboard</a>
+        <a href="/api/products" class="btn">📦 Products API</a>
+        <a href="/api/transactions" class="btn">💰 Transactions API</a>
+        <a href="/api/login" class="btn">🔐 Login API</a>
+        
+        <h2>Mobile Test</h2>
+        <p>Scan this QR code to open on your phone:</p>
+        <div id="qrcode"></div>
+        <p>Or manually enter URL: <code id="mobile-url"></code></p>
+        
+        <h2>Troubleshooting</h2>
+        <p>If you can't access:</p>
+        <ol>
+            <li>Check if port 3000 is open: <code>sudo ufw allow 3000/tcp</code></li>
+            <li>Restart PM2: <code>pm2 restart pos-kasir</code></li>
+            <li>Check logs: <code>pm2 logs pos-kasir</code></li>
+        </ol>
+    </div>
+    
+    <script>
+        // Set server info
+        document.getElementById('server-ip').textContent = window.location.hostname;
+        document.getElementById('access-time').textContent = new Date().toLocaleString();
+        document.getElementById('mobile-url').textContent = window.location.origin;
+        
+        // Generate QR code
+        const qrUrl = window.location.origin;
+        const qrDiv = document.getElementById('qrcode');
+        qrDiv.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}" alt="QR Code">`;
+        
+        // Test API
+        async function testAPI() {
+            try {
+                const response = await fetch('/api/products');
+                const statusDiv = document.getElementById('api-status');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.className = 'status online';
+                    statusDiv.innerHTML = `✅ API Online - ${data.length} products found`;
+                } else {
+                    statusDiv.className = 'status offline';
+                    statusDiv.innerHTML = `❌ API Error - Status: ${response.status}`;
+                }
+            } catch (error) {
+                document.getElementById('api-status').className = 'status offline';
+                document.getElementById('api-status').innerHTML = '❌ Cannot connect to API';
+            }
+        }
+        
+        // Test database
+        async function testDB() {
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                
+                const statusDiv = document.getElementById('db-status');
+                
+                if (response.ok) {
+                    statusDiv.className = 'status online';
+                    statusDiv.innerHTML = '✅ Database Connected - Login test successful';
+                } else {
+                    statusDiv.className = 'status offline';
+                    statusDiv.innerHTML = '❌ Database Error - Login failed';
+                }
+            } catch (error) {
+                document.getElementById('db-status').className = 'status offline';
+                document.getElementById('db-status').innerHTML = '❌ Cannot test database';
+            }
+        }
+        
+        // Run tests
+        testAPI();
+        testDB();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            testAPI();
+            testDB();
+        }, 30000);
+    </script>
+</body>
+</html>
