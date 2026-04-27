@@ -6,6 +6,7 @@ const url = process.env.TURSO_URL || `file:${path.join(process.cwd(), 'data', 'p
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
 let client: Client | null = null;
+let initialized = false;
 
 export function getDb(): Client {
   if (!client) {
@@ -15,6 +16,13 @@ export function getDb(): Client {
     });
   }
   return client;
+}
+
+export async function ensureDb() {
+  if (!initialized) {
+    await initializeDatabase();
+    initialized = true;
+  }
 }
 
 export async function initializeDatabase() {

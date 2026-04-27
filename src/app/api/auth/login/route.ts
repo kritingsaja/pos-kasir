@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByUsername } from '@/lib/db';
+import { getUserByUsername, ensureDb } from '@/lib/db';
 import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 
@@ -7,6 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_pos_kasir_
 
 export async function POST(req: NextRequest) {
     try {
+        await ensureDb();
         const { username, password } = await req.json();
 
         if (!username || !password) {
