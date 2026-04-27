@@ -59,9 +59,13 @@ export async function POST(req: NextRequest) {
         return response;
     } catch (error: any) {
         console.error('Login error:', error);
+        // Cek kunci apa saja yang ada di environment (HANYA KUNCI, BUKAN NILAI/TOKEN)
+        const envKeys = Object.keys(process.env).filter(k => k.includes('TURSO') || k.includes('LIBSQL') || k.includes('DATABASE'));
+        
         return NextResponse.json({ 
             success: false, 
-            error: 'ERROR: ' + (error.message || 'Unknown Server Error') 
+            error: 'ERROR: ' + (error.message || 'Unknown Server Error'),
+            available_vars: envKeys
         }, { status: 500 });
     }
 }
