@@ -27,13 +27,10 @@ export async function ensureDb() {
 
 export async function initializeDatabase() {
   const db = getDb();
-  console.log("Initializing database...");
+  console.log("Initializing database schema...");
   
-  if (!url.startsWith('libsql') && isProd) {
-    console.error("CRITICAL: No Libsql URL detected. Check your environment variables.");
-  }
-
   try {
+    // 1. Create Tables
     const schema = [
       `CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,10 +60,7 @@ export async function initializeDatabase() {
         nama_pelanggan TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
       )`,
-      `CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      )`,
+      `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
       `CREATE TABLE IF NOT EXISTS drafts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nama_draft TEXT NOT NULL,
@@ -117,22 +111,10 @@ export async function initializeDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_transactions_tanggal ON transactions(tanggal)`
     ];
 
-    // Use batch for all table creations
     await db.batch(schema.map(sql => ({ sql, args: [] })));
-    console.log("All tables checked/created.");
+    console.log("Tables OK.");
 
-    // Check columns for migration
-    const tableInfo = await db.execute("PRAGMA table_info(transactions)");
-    const cols = tableInfo.rows.map(r => String(r.name));
-    
-    if (!cols.includes('kasir')) {
-      await db.execute("ALTER TABLE transactions ADD COLUMN kasir TEXT DEFAULT 'Admin'");
-    }
-    if (!cols.includes('nama_pelanggan')) {
-      await db.execute("ALTER TABLE transactions ADD COLUMN nama_pelanggan TEXT DEFAULT ''");
-    }
-
-    // Default settings
+    // 2. Default Settings
     await db.batch([
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['nama_toko', 'TOKO SAYA'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['alamat_toko', 'Jl. Contoh No. 123'] },
@@ -140,24 +122,27 @@ export async function initializeDatabase() {
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] }
     ]);
 
-    // Default users (admin/admin and kasir/admin)
+    // 3. Default Users
     const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
     await db.batch([
       { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['admin', defaultPassword, 'Admin'] },
       { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['kasir', defaultPassword, 'Kasir'] }
     ]);
 
-    // Default categories
-    const countCats = await db.execute('SELECT COUNT(*) as c FROM categories');
-    if (Number(countCats.rows[0]?.c) === 0) {
-      const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
-      await db.batch(cats.map(cat => ({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] })));
-    }
-    
-    console.log("Database successfully prepared.");
+    // 4. Default Categories
+    try {
+      const countRes = await db.execute('SELECT COUNT(*) as c FROM categories');
+      if (Number((countRes.rows[0] as any).c) === 0) {
+        const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
+        await db.batch(cats.map(cat => ({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] })));
+      }
+    } catch (e) { console.log("Category seed skipped or failed"); }
+
+    console.log("Database initialized.");
   } catch (error) {
     console.error("DATABASE FAIL:", error);
-    throw error;
+    // Don't throw here, let the app try to continue if possible, 
+    // or it will throw on the first real query anyway.
   }
 }
 
