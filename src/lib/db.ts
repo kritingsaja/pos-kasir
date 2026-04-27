@@ -2,8 +2,8 @@ import { createClient, Client } from '@libsql/client';
 import path from 'path';
 
 const isProd = process.env.NODE_ENV === 'production';
-const url = process.env.TURSO_URL || `file:${path.join(process.cwd(), 'data', 'pos.db')}`;
-const authToken = process.env.TURSO_AUTH_TOKEN;
+const url = process.env.TURSO_URL || process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL || `file:${path.join(process.cwd(), 'data', 'pos.db')}`;
+const authToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
 
 let client: Client | null = null;
 let initialized = false;
@@ -27,10 +27,10 @@ export async function ensureDb() {
 
 export async function initializeDatabase() {
   const db = getDb();
-  console.log("Checking database connection to:", url);
+  console.log("Initializing database...");
   
-  if (!process.env.TURSO_URL && isProd) {
-    console.error("CRITICAL: TURSO_URL is missing in production environment!");
+  if (!url.startsWith('libsql') && isProd) {
+    console.error("CRITICAL: No Libsql URL detected. Check your environment variables.");
   }
 
   try {
@@ -117,15 +117,14 @@ export async function initializeDatabase() {
       `CREATE INDEX IF NOT EXISTS idx_transactions_tanggal ON transactions(tanggal)`
     ];
 
-    console.log("Creating tables...");
-    for (const sql of schema) {
-      await db.execute(sql);
-    }
-    console.log("Schema initialized successfully.");
+    // Use batch for all table creations
+    await db.batch(schema.map(sql => ({ sql, args: [] })));
+    console.log("All tables checked/created.");
 
-    // Migration: Add columns if they don't exist
-    const tableInfo = await db.execute("SELECT name FROM pragma_table_info('transactions')");
-    const cols = tableInfo.rows.map(r => r.name);
+    // Check columns for migration
+    const tableInfo = await db.execute("PRAGMA table_info(transactions)");
+    const cols = tableInfo.rows.map(r => String(r.name));
+    
     if (!cols.includes('kasir')) {
       await db.execute("ALTER TABLE transactions ADD COLUMN kasir TEXT DEFAULT 'Admin'");
     }
@@ -133,46 +132,31 @@ export async function initializeDatabase() {
       await db.execute("ALTER TABLE transactions ADD COLUMN nama_pelanggan TEXT DEFAULT ''");
     }
 
-    // Default values
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-      args: ['nama_toko', 'TOKO SAYA']
-    });
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-      args: ['alamat_toko', 'Jl. Contoh No. 123']
-    });
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-      args: ['telepon_toko', '08123456789']
-    });
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-      args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!']
-    });
+    // Default settings
+    await db.batch([
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['nama_toko', 'TOKO SAYA'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['alamat_toko', 'Jl. Contoh No. 123'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['telepon_toko', '08123456789'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] }
+    ]);
 
-    // Default users
+    // Default users (admin/admin and kasir/admin)
     const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-      args: ['admin', defaultPassword, 'Admin']
-    });
-    await db.execute({
-      sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)',
-      args: ['kasir', defaultPassword, 'Kasir']
-    });
+    await db.batch([
+      { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['admin', defaultPassword, 'Admin'] },
+      { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['kasir', defaultPassword, 'Kasir'] }
+    ]);
 
     // Default categories
     const countCats = await db.execute('SELECT COUNT(*) as c FROM categories');
     if (Number(countCats.rows[0]?.c) === 0) {
       const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
-      for (const cat of cats) {
-        await db.execute({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] });
-      }
+      await db.batch(cats.map(cat => ({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] })));
     }
-    console.log("Database seeded successfully.");
+    
+    console.log("Database successfully prepared.");
   } catch (error) {
-    console.error("DATABASE INIT ERROR:", error);
+    console.error("DATABASE FAIL:", error);
     throw error;
   }
 }
