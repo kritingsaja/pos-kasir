@@ -26,7 +26,7 @@ export default async function BosPage() {
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 mb-8 shadow-md text-white transform transition-transform hover:scale-105 duration-300">
             <p className="text-sm text-blue-100 font-medium mb-1">Total Pendapatan</p>
             <h2 className="text-4xl font-extrabold tracking-tight">
-              Rp {(stats?.total_penjualan || 0).toLocaleString('id-ID')}
+              Rp {Number(stats?.total_penjualan || 0).toLocaleString('id-ID')}
             </h2>
           </div>
           
@@ -48,7 +48,7 @@ export default async function BosPage() {
                 </svg>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Rata-rata</p>
               </div>
-              <p className="text-xl font-bold text-gray-800">Rp {(stats?.rata_rata || 0).toLocaleString('id-ID')}</p>
+              <p className="text-xl font-bold text-gray-800">Rp {Number(stats?.rata_rata || 0).toLocaleString('id-ID')}</p>
             </div>
           </div>
         </div>
