@@ -38,7 +38,7 @@ export default async function BosPage() {
                 </svg>
                 <p className="text-xs text-gray-500 uppercase font-semibold">Transaksi</p>
               </div>
-              <p className="text-xl font-bold text-gray-800">{stats?.total_transaksi || 0}</p>
+              <p className="text-xl font-bold text-gray-800">{Number(stats?.total_transaksi || 0)}</p>
             </div>
             
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
