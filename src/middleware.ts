@@ -11,10 +11,11 @@ export async function middleware(request: NextRequest) {
     // Root or login page should not be protected right here if the intent is to redirect
     // But actually let's just make it simple:
     const isLoginPage = path === '/login';
+    const isBosPage = path === '/bos' || path.startsWith('/api/bos');
     const isAuthApi = path.startsWith('/api/auth/');
     const isPublicAsset = path.match(/\.(png|jpg|jpeg|gif|svg|ico|json|webmanifest)$/i) || path === '/manifest.ts';
 
-    if (!token && !isLoginPage && !isAuthApi && !isPublicAsset) {
+    if (!token && !isLoginPage && !isBosPage && !isAuthApi && !isPublicAsset) {
         if (path.startsWith('/api/')) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
