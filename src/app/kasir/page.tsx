@@ -44,6 +44,10 @@ export default function KasirPage() {
     const [selectedCategory, setSelectedCategory] = useState('Semua');
     const [namaPelanggan, setNamaPelanggan] = useState('');
     const [settings, setSettings] = useState<{ [key: string]: string }>({});
+    
+    // Fitur: Diskon Keseluruhan
+    const [globalDiskon, setGlobalDiskon] = useState<string>('');
+    const [globalTipeDiskon, setGlobalTipeDiskon] = useState<0 | 1>(1); // 0=persen, 1=rupiah
 
     const { isOnline, saveOfflineTransaction } = useOfflineSync();
 
@@ -315,6 +319,8 @@ export default function KasirPage() {
         setNamaPelanggan('');
         setEditingItem(null);
         setEditingNote(null);
+        setGlobalDiskon('');
+        setGlobalTipeDiskon(1);
     }
 
     // ── Fitur 1: update harga & diskon manual ──
@@ -352,8 +358,9 @@ export default function KasirPage() {
         );
     }
 
-    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-    const diskonTotal = cart.reduce((sum, item) => {
+    const subtotal = cart.reduce((sum, item) => sum + (item.harga_override ?? item.harga_jual) * item.qty, 0);
+
+    const itemDiskonTotal = cart.reduce((sum, item) => {
         if (item.diskon > 0) {
             const harga = item.harga_override ?? item.harga_jual;
             if (item.tipe_diskon === 1) return sum + item.diskon * item.qty;
@@ -361,7 +368,16 @@ export default function KasirPage() {
         }
         return sum;
     }, 0);
-    const total = subtotal;
+
+    const totalSetelahItemDiskon = subtotal - itemDiskonTotal;
+
+    const gDiskon = parseFloat(globalDiskon) || 0;
+    const globalDiskonAmount = gDiskon > 0
+        ? (globalTipeDiskon === 1 ? gDiskon : (totalSetelahItemDiskon * gDiskon / 100))
+        : 0;
+
+    const diskonTotal = itemDiskonTotal + globalDiskonAmount;
+    const total = Math.max(0, subtotal - diskonTotal);
     const kembalian = bayar - total;
 
     function showToast(message: string, type: string = 'success') {
@@ -389,8 +405,10 @@ export default function KasirPage() {
     async function confirmSaveDraft() {
         const finalDraftName = draftNameInput.trim() || `Draft - ${new Date().toLocaleTimeString('id-ID')}`;
         try {
-            const res = await fetch('/api/drafts', {
-                method: 'POST',
+            const url = loadedDraftId ? `/api/drafts/${loadedDraftId}` : '/api/drafts';
+            const method = loadedDraftId ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     nama_draft: finalDraftName,
@@ -402,7 +420,7 @@ export default function KasirPage() {
             });
             const data = await res.json();
             if (data.success) {
-                showToast('Draft berhasil disimpan!');
+                showToast(loadedDraftId ? 'Draft berhasil diperbarui!' : 'Draft berhasil disimpan!');
                 fetchDrafts();
                 clearCart();
                 setStep('selection');
@@ -583,12 +601,23 @@ export default function KasirPage() {
 
         const tempId = customData ? `DRAFT-${customData.id}` : (loadedDraftId ? `DRAFT-${loadedDraftId}` : `DRAFT-${Date.now().toString().slice(-4)}`);
 
+        // Untuk re-calculate dari sourceCart bila diperlukan (misal untuk cetak history draft)
+        let cetakSubtotal = subtotal;
+        let cetakDiskonTotal = diskonTotal;
+        let cetakTotal = total;
+
+        if (customData) {
+            cetakSubtotal = customData.subtotal;
+            cetakDiskonTotal = customData.diskon_total;
+            cetakTotal = customData.total;
+        }
+
         setLastTransaction({
             id: tempId,
             items: [...sourceCart],
-            subtotal: customData ? sourceCart.reduce((s: number, i: any) => s + i.subtotal, 0) : subtotal,
-            diskonTotal: customData ? 0 : diskonTotal,
-            total: customData ? sourceCart.reduce((s: number, i: any) => s + i.subtotal, 0) : total,
+            subtotal: cetakSubtotal,
+            diskonTotal: cetakDiskonTotal,
+            total: cetakTotal,
             bayar: 0,
             kembalian: 0,
             nama_pelanggan: sourceNama.trim(),
@@ -950,6 +979,31 @@ export default function KasirPage() {
                                     >
                                         Uang Pas
                                     </button>
+                                </div>
+
+                                <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Diskon Keseluruhan (Opsional)</p>
+                                <div className="payment-input" style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={globalDiskon}
+                                        onChange={(e) => setGlobalDiskon(e.target.value)}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button
+                                            className={`btn btn-sm ${globalTipeDiskon === 0 ? 'btn-primary' : 'btn-secondary'}`}
+                                            onClick={() => setGlobalTipeDiskon(0)}
+                                        >
+                                            %
+                                        </button>
+                                        <button
+                                            className={`btn btn-sm ${globalTipeDiskon === 1 ? 'btn-primary' : 'btn-secondary'}`}
+                                            onClick={() => setGlobalTipeDiskon(1)}
+                                        >
+                                            Rp
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {bayar > 0 && (

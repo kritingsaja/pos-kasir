@@ -401,6 +401,14 @@ export async function deleteDraft(id: number) {
   });
 }
 
+export async function updateDraft(id: number, draft: any) {
+  const db = getDb();
+  return await db.execute({
+    sql: 'UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?',
+    args: [draft.nama_draft, draft.items, draft.subtotal, draft.diskon_total, draft.total, id]
+  });
+}
+
 // Settings
 export async function getSetting(key: string) {
   const db = getDb();
