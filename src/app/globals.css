@@ -1674,6 +1674,102 @@ input::placeholder {
   }
 }
 
+/* ══════════════════════════════════════════
+   TABLET POS LAYOUT (>= 768px)
+   Side-by-side: products left, cart right.
+   NOT touching any @media (max-width: 768px)
+══════════════════════════════════════════ */
+@media (min-width: 768px) {
+
+  /* Main POS container: side-by-side 2 columns */
+  .tablet-pos-layout {
+    display: grid !important;
+    grid-template-columns: 1fr 340px !important;
+    gap: 16px !important;
+    align-items: start !important;
+    min-height: calc(100vh - 80px);
+    padding-bottom: 0 !important;
+  }
+
+  /* Left column: products */
+  .tablet-products-col {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+    position: sticky;
+    top: 0;
+  }
+
+  /* Products grid on tablet: 2-3 cols, scrollable */
+  .tablet-products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    gap: 10px !important;
+    padding: 12px 16px 24px !important;
+    overflow-y: auto !important;
+    max-height: none !important;
+    flex: 1 !important;
+  }
+
+  /* ── Tablet Cart Sidebar ── */
+  .tablet-cart-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .tablet-cart-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-raised);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .tablet-cart-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+
+  .tablet-cart-footer {
+    border-top: 1px solid var(--border-soft);
+    padding: 14px 16px;
+    background: var(--bg-surface);
+    box-shadow: 0 -4px 16px rgba(28, 24, 20, 0.06);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* On smaller tablets, reduce sidebar width a bit */
+  .tablet-pos-layout {
+    grid-template-columns: 1fr 300px !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Wider screens: give cart more breathing room */
+  .tablet-pos-layout {
+    grid-template-columns: 1fr 360px !important;
+  }
+  .tablet-products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+  }
+}
+
 @media (max-width: 768px) {
 
   /* Mobile text inputs: avoid tiny font sizes */

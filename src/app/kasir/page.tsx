@@ -73,6 +73,9 @@ export default function KasirPage() {
     const [pillBottom, setPillBottom] = useState(20);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
 
+    // Tablet detection (>= 768px)
+    const [isTablet, setIsTablet] = useState(false);
+
     useEffect(() => {
         void fetchProducts();
         void fetchDrafts();
@@ -101,6 +104,13 @@ export default function KasirPage() {
             setIsInitialized(true);
         }
 
+        // Tablet detection
+        function checkTablet() {
+            setIsTablet(window.innerWidth >= 768);
+        }
+        checkTablet();
+        window.addEventListener('resize', checkTablet);
+
         // Keyboard-aware bottom elements: track visual viewport
         const vv = window.visualViewport;
         function onViewportResize() {
@@ -115,6 +125,7 @@ export default function KasirPage() {
         vv?.addEventListener('resize', onViewportResize);
         vv?.addEventListener('scroll', onViewportResize);
         return () => {
+            window.removeEventListener('resize', checkTablet);
             vv?.removeEventListener('resize', onViewportResize);
             vv?.removeEventListener('scroll', onViewportResize);
         };
@@ -659,89 +670,272 @@ export default function KasirPage() {
                 </div>
             </div>
 
-            <div className={`pos-layout ${step === 'selection' ? 'step-selection' : ''}`}>
+            <div className={`pos-layout ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
                 {/* STEP 1: PRODUCTS SELECTION */}
                 {step === 'selection' && (
-                    <div className="pos-products" style={{ gridColumn: '1 / -1' }}>
-                        <div className="products-header">
-                            <div className="search-bar" style={{ flex: 1 }}>
-                                <span className="search-icon">🔍</span>
-                                <input
-                                    type="search"
-                                    placeholder="Search Name or Code"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    autoFocus
-                                />
+                    <>
+                        {/* ── LEFT: Product Grid ── */}
+                        <div className={`pos-products ${isTablet ? 'tablet-products-col' : ''}`}>
+                            <div className="products-header">
+                                <div className="search-bar" style={{ flex: 1 }}>
+                                    <span className="search-icon">🔍</span>
+                                    <input
+                                        type="search"
+                                        placeholder="Search Name or Code"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {categories.length > 0 && (
-                            <div className="category-filter-bar">
-                                {categories.map((cat) => (
-                                    <button
-                                        key={cat}
-                                        className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
-                                        onClick={() => setSelectedCategory(cat)}
-                                    >
-                                        {cat}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                            {categories.length > 0 && (
+                                <div className="category-filter-bar">
+                                    {categories.map((cat) => (
+                                        <button
+                                            key={cat}
+                                            className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
+                                            onClick={() => setSelectedCategory(cat)}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
 
-                        <div className="products-grid">
-                            {filteredProducts.map((product) => {
-                                const cartItem = cart.find(item => item.kode_barang === product.kode_barang);
-                                const quantity = cartItem ? cartItem.qty : 0;
-                                const initials = product.nama_barang.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                            <div className={`products-grid ${isTablet ? 'tablet-products-grid' : ''}`}>
+                                {filteredProducts.map((product) => {
+                                    const cartItem = cart.find(item => item.kode_barang === product.kode_barang);
+                                    const quantity = cartItem ? cartItem.qty : 0;
 
-                                return (
-                                    <div
-                                        key={product.id}
-                                        className={`product-card ${quantity > 0 ? 'active' : ''}`}
-                                        onClick={() => {
-                                            addToCart(product);
-                                            const searchInput = document.querySelector('.search-bar input') as HTMLInputElement;
-                                            if (searchInput) searchInput.focus();
-                                        }}
-                                    >
-                                        <div className="product-info">
-                                            <div className="product-name">{product.nama_barang}</div>
-                                            <div className="product-price" style={{ fontSize: '13px', fontWeight: 800, color: 'var(--success)' }}>{formatRupiah(product.harga_jual)}</div>
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className={`product-card ${quantity > 0 ? 'active' : ''}`}
+                                            onClick={() => {
+                                                addToCart(product);
+                                                const searchInput = document.querySelector('.search-bar input') as HTMLInputElement;
+                                                if (searchInput) searchInput.focus();
+                                            }}
+                                        >
+                                            <div className="product-info">
+                                                <div className="product-name">{product.nama_barang}</div>
+                                                <div className="product-price" style={{ fontSize: '13px', fontWeight: 800, color: 'var(--success)' }}>{formatRupiah(product.harga_jual)}</div>
+                                            </div>
+                                            {quantity > 0 && <div className="product-badge">{quantity}</div>}
                                         </div>
-                                        {quantity > 0 && <div className="product-badge">{quantity}</div>}
+                                    );
+                                })}
+                                {filteredProducts.length === 0 && (
+                                    <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+                                        <div className="empty-icon">🔍</div>
+                                        <p>Produk tidak ditemukan</p>
                                     </div>
-                                );
-                            })}
-                            {filteredProducts.length === 0 && (
-                                <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
-                                    <div className="empty-icon">🔍</div>
-                                    <p>Produk tidak ditemukan</p>
+                                )}
+                            </div>
+
+                            {/* Mobile only: floating pill */}
+                            {!isTablet && cart.length > 0 && (
+                                <div
+                                    className="selection-cart-pill"
+                                    style={{ bottom: `${pillBottom}px`, transition: 'bottom 0.2s ease' }}
+                                    onClick={() => setStep('review')}
+                                >
+                                    <div className="cart-info">
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <span style={{ fontSize: '18px', fontWeight: '800' }}>{formatRupiah(subtotal)}</span>
+                                            <span style={{ fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>
+                                                {cart.reduce((sum, item) => sum + item.qty, 0)} Item Terpilih
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); setStep('review'); }}>
+                                        CONTINUE <span style={{ fontSize: '18px' }}>›</span>
+                                    </button>
                                 </div>
                             )}
                         </div>
 
-                        {cart.length > 0 && (
-                            <div
-                                className="selection-cart-pill"
-                                style={{ bottom: `${pillBottom}px`, transition: 'bottom 0.2s ease' }}
-                                onClick={() => setStep('review')}
-                            >
-                                <div className="cart-info">
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        <span style={{ fontSize: '18px', fontWeight: '800' }}>{formatRupiah(subtotal)}</span>
-                                        <span style={{ fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>
-                                            {cart.reduce((sum, item) => sum + item.qty, 0)} Item Terpilih
-                                        </span>
+                        {/* ── RIGHT: Tablet Cart Sidebar (tablet only) ── */}
+                        {isTablet && (
+                            <div className="tablet-cart-sidebar">
+                                <div className="tablet-cart-header">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ fontSize: '20px' }}>🛒</span>
+                                        <div>
+                                            <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-900)' }}>Keranjang</div>
+                                            {loadedDraftId && <div style={{ fontSize: '11px', color: 'var(--brand)', fontWeight: 600 }}>✏️ Editing Draft</div>}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        {savedDrafts.length > 0 && (
+                                            <button
+                                                className="btn btn-sm btn-secondary"
+                                                onClick={() => setShowDraftsList(true)}
+                                                style={{ fontSize: '12px', padding: '5px 10px' }}
+                                            >
+                                                📋 <span className="pill-badge" style={{ background: 'var(--brand)', color: '#fff', borderRadius: '10px', padding: '1px 6px', fontSize: '11px' }}>{savedDrafts.length}</span>
+                                            </button>
+                                        )}
+                                        {cart.length > 0 && (
+                                            <button
+                                                className="btn btn-sm btn-danger"
+                                                onClick={() => { clearCart(); }}
+                                                style={{ fontSize: '12px', padding: '5px 10px' }}
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); setStep('review'); }}>
-                                    CONTINUE <span style={{ fontSize: '18px' }}>›</span>
-                                </button>
+
+                                <div className="tablet-cart-items">
+                                    {cart.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-300)' }}>
+                                            <div style={{ fontSize: '36px', marginBottom: '10px', opacity: 0.3 }}>🛒</div>
+                                            <p style={{ fontSize: '13px' }}>Pilih produk untuk ditambahkan</p>
+                                        </div>
+                                    ) : (
+                                        cart.map((item) => {
+                                            const isEditing = editingItem === item.kode_barang;
+                                            const isEditingNote = editingNote === item.kode_barang;
+                                            const effectiveHarga = item.harga_override ?? item.harga_jual;
+                                            const hasPriceOverride = item.harga_override !== undefined && item.harga_override !== item.harga_jual;
+                                            const hasDiskon = item.diskon > 0;
+                                            return (
+                                                <div key={item.kode_barang} className="cart-item-wrap">
+                                                    <div className="cart-item">
+                                                        <div className="cart-item-info">
+                                                            <div className="item-name">{item.nama_barang}</div>
+                                                            <div className="item-price">
+                                                                {hasPriceOverride ? (
+                                                                    <>
+                                                                        <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '10px', marginRight: '4px' }}>
+                                                                            {formatRupiah(item.harga_jual)}
+                                                                        </span>
+                                                                        <span style={{ color: 'var(--warning)' }}>{formatRupiah(effectiveHarga)}</span>
+                                                                    </>
+                                                                ) : (
+                                                                    formatRupiah(effectiveHarga)
+                                                                )}
+                                                                {hasDiskon && (
+                                                                    <span className="diskon-badge">
+                                                                        -{item.tipe_diskon === 1 ? formatRupiah(item.diskon) : `${item.diskon}%`}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {item.catatan && <div className="item-catatan">📝 {item.catatan}</div>}
+                                                        </div>
+                                                        <div className="cart-item-qty">
+                                                            <button onClick={() => updateQty(item.kode_barang, -1)}>−</button>
+                                                            <span className="qty-value">{item.qty}</span>
+                                                            <button onClick={() => updateQty(item.kode_barang, 1)}>+</button>
+                                                        </div>
+                                                        <div className="cart-item-subtotal">{formatRupiah(item.subtotal)}</div>
+                                                        <div className="cart-item-actions-group">
+                                                            <button
+                                                                className="cart-item-action-btn"
+                                                                title="Edit harga/diskon"
+                                                                onClick={() => isEditing ? setEditingItem(null) : startEditItem(item)}
+                                                            >✏️</button>
+                                                            <button
+                                                                className="cart-item-action-btn"
+                                                                title="Tambah catatan"
+                                                                onClick={() => setEditingNote(isEditingNote ? null : item.kode_barang)}
+                                                            >📝</button>
+                                                        </div>
+                                                        <button className="cart-item-remove" onClick={() => removeFromCart(item.kode_barang)}>✕</button>
+                                                    </div>
+                                                    {isEditing && (
+                                                        <div className="item-edit-form">
+                                                            <div className="item-edit-row">
+                                                                <label>Harga (Rp)</label>
+                                                                <input type="number" value={editHarga} onChange={e => setEditHarga(e.target.value)} placeholder="Harga baru..." />
+                                                            </div>
+                                                            <div className="item-edit-row">
+                                                                <label>Diskon</label>
+                                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                    <input type="number" value={editDiskon} onChange={e => setEditDiskon(e.target.value)} placeholder="0" style={{ flex: 1 }} />
+                                                                    <button className={`tipe-diskon-btn ${editTipeDiskon === 0 ? 'active' : ''}`} onClick={() => setEditTipeDiskon(0)}>%</button>
+                                                                    <button className={`tipe-diskon-btn ${editTipeDiskon === 1 ? 'active' : ''}`} onClick={() => setEditTipeDiskon(1)}>Rp</button>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                                                <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={() => setEditingItem(null)}>Batal</button>
+                                                                <button className="btn btn-sm btn-primary" style={{ flex: 1 }} onClick={() => applyEditItem(item.kode_barang)}>Terapkan</button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {isEditingNote && (
+                                                        <div className="item-note-wrap">
+                                                            <input
+                                                                className="item-note-input"
+                                                                type="text"
+                                                                placeholder="Contoh: panas less sugar..."
+                                                                value={item.catatan || ''}
+                                                                onChange={e => updateItemNote(item.kode_barang, e.target.value)}
+                                                                onKeyDown={e => { if (e.key === 'Enter') setEditingNote(null); }}
+                                                                autoFocus
+                                                            />
+                                                            <button className="btn btn-sm btn-primary" onClick={() => setEditingNote(null)}>OK</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+
+                                <div className="tablet-cart-footer">
+                                    <div className="cart-summary">
+                                        <div className="cart-summary-row">
+                                            <span>Subtotal</span>
+                                            <span>{formatRupiah(subtotal)}</span>
+                                        </div>
+                                        {diskonTotal > 0 && (
+                                            <div className="cart-summary-row">
+                                                <span>Diskon</span>
+                                                <span>-{formatRupiah(diskonTotal)}</span>
+                                            </div>
+                                        )}
+                                        <div className="cart-summary-row total">
+                                            <span>TOTAL</span>
+                                            <span>{formatRupiah(total)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Nama pelanggan (opsional)"
+                                            value={namaPelanggan}
+                                            onChange={(e) => setNamaPelanggan(e.target.value)}
+                                            style={{ flex: 1, fontSize: '13px', padding: '8px 12px' }}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                        <button
+                                            className="btn btn-warning"
+                                            style={{ width: '100%' }}
+                                            onClick={handleSaveDraft}
+                                            disabled={cart.length === 0}
+                                        >
+                                            💾 {loadedDraftId ? 'Update' : 'Draft'}
+                                        </button>
+                                        <button
+                                            className="btn btn-success"
+                                            style={{ width: '100%' }}
+                                            onClick={() => setStep('payment')}
+                                            disabled={cart.length === 0}
+                                        >
+                                            💵 Bayar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
-                    </div>
+                    </>
                 )}
 
                 {/* STEP 2: REVIEW CART */}
