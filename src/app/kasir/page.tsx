@@ -642,35 +642,30 @@ export default function KasirPage() {
 
     return (
         <>
-            <div className="page-header">
-                <div className="header-main compact-kasir-header">
-                    <div className="kasir-header-title">
-                        <h1>Transaction</h1>
+            <div className={`pos-layout with-side-actions ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
+                {step === 'selection' && (
+                    <div className="kasir-side-actions">
+                        <button
+                            className="btn-side-action sales"
+                            onClick={() => setShowLaporanPanel(true)}
+                            title="Sales"
+                        >
+                            <span className="action-icon">📊</span>
+                            <span className="action-label">Sales</span>
+                        </button>
+                        <button
+                            className="btn-side-action draft"
+                            onClick={() => setShowDraftsList(true)}
+                            title="Draft"
+                        >
+                            <span className="action-icon">📋</span>
+                            <span className="action-label">Draft</span>
+                            {savedDrafts.length > 0 && (
+                                <span className="action-badge">{savedDrafts.length}</span>
+                            )}
+                        </button>
                     </div>
-
-                    {step === 'selection' && (
-                        <div className="kasir-header-actions">
-                            <button
-                                className="btn-header-pill sales"
-                                onClick={() => setShowLaporanPanel(true)}
-                                title="Lihat Hasil Penjualan"
-                            >
-                                <span className="pill-icon">📊</span>
-                                <span className="pill-text">Sales</span>
-                            </button>
-                            <button
-                                className="btn-header-pill draft"
-                                onClick={() => setShowDraftsList(true)}
-                            >
-                                <span className="pill-icon">📋</span>
-                                <span className="pill-text">Draft <span className="pill-badge">{savedDrafts.length}</span></span>
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className={`pos-layout ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
+                )}
                 {/* STEP 1: PRODUCTS SELECTION */}
                 {step === 'selection' && (
                     <>

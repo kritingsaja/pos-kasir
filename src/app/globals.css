@@ -742,7 +742,103 @@ input::placeholder {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
-  /* tidak ada gap antar section */
+}
+
+.pos-layout.with-side-actions {
+  grid-template-columns: auto 1fr;
+}
+
+/* ── KASIR SIDE ACTIONS ── */
+.kasir-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 10px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-soft);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  align-items: center;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+}
+
+.btn-side-action {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-700);
+  padding: 4px;
+  position: relative;
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-side-action:hover {
+  background: var(--brand-dim);
+  border-color: var(--brand);
+  color: var(--brand);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-side-action.sales {
+  color: var(--info);
+}
+.btn-side-action.sales:hover {
+  background: var(--info-bg);
+  border-color: var(--info);
+}
+
+.btn-side-action.draft {
+  color: var(--brand);
+}
+
+.btn-side-action .action-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.btn-side-action .action-label {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-top: 3px;
+  letter-spacing: 0.2px;
+}
+
+.btn-side-action .action-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--brand);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 2px solid var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+  .kasir-side-actions {
+    padding-top: 64px !important;
+    width: 60px !important;
+  }
 }
 
 .pos-products {
@@ -1684,8 +1780,8 @@ input::placeholder {
   /* Main POS container: side-by-side 2 columns */
   .tablet-pos-layout {
     display: grid !important;
-    grid-template-columns: 1fr 340px !important;
-    gap: 16px !important;
+    grid-template-columns: 68px 1fr 340px !important;
+    gap: 0 !important;
     align-items: start !important;
     min-height: calc(100vh - 80px);
     padding-bottom: 0 !important;
@@ -1699,6 +1795,8 @@ input::placeholder {
     overflow: hidden;
     position: sticky;
     top: 0;
+    border-left: 1px solid var(--border-soft);
+    padding-left: 16px;
   }
 
   /* Products grid on tablet: 2-3 cols, scrollable */
