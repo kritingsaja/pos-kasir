@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const navItems = [
     { href: '/', icon: '📊', label: 'Dashboard', access: ['Admin'] },
@@ -11,6 +12,11 @@ const navItems = [
     { href: '/bahan-baku', icon: '🧪', label: 'Bahan Baku', access: ['Admin'] },
     { href: '/laporan', icon: '📋', label: 'Laporan', access: ['Admin'] },
     { href: '/pengaturan', icon: '⚙️', label: 'Pengaturan', access: ['Admin'] },
+];
+
+const kasirActionItems = [
+    { eventName: 'kasir:open-sales', icon: '📊', label: 'Sales' },
+    { eventName: 'kasir:open-drafts', icon: '📋', label: 'Draft' },
 ];
 
 interface SidebarProps {
@@ -24,6 +30,7 @@ interface SidebarProps {
 export default function Sidebar({ isCollapsed, onToggle, userRole, username, onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
+    const [draftCount, setDraftCount] = useState(0);
 
     const handleLogout = async () => {
         try {
@@ -39,6 +46,22 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
         if (!userRole) return false;
         return item.access.some(role => role.toLowerCase() === normalizedRole);
     });
+    const shouldShowKasirActions = pathname === '/kasir' && normalizedRole === 'kasir';
+
+    useEffect(() => {
+        const handleDraftCount = (event: Event) => {
+            const customEvent = event as CustomEvent<{ count?: number }>;
+            setDraftCount(customEvent.detail?.count || 0);
+        };
+
+        window.addEventListener('kasir:draft-count', handleDraftCount);
+        return () => window.removeEventListener('kasir:draft-count', handleDraftCount);
+    }, []);
+
+    const handleKasirAction = (eventName: string) => {
+        window.dispatchEvent(new CustomEvent(eventName));
+        onNavigate?.();
+    };
 
     return (
         <aside className="sidebar">
@@ -87,6 +110,26 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
                         {!isCollapsed && <span className="nav-text">{item.label}</span>}
                     </Link>
                 ))}
+                {shouldShowKasirActions && (
+                    <div className="sidebar-nav-actions" aria-label="Aksi kasir">
+                        {!isCollapsed && <div className="sidebar-nav-section">Aksi</div>}
+                        {kasirActionItems.map((item) => (
+                            <button
+                                key={item.eventName}
+                                type="button"
+                                className={`nav-link nav-action ${isCollapsed ? 'collapsed' : ''}`}
+                                title={isCollapsed ? item.label : undefined}
+                                onClick={() => handleKasirAction(item.eventName)}
+                            >
+                                <span className="nav-icon">{item.icon}</span>
+                                {!isCollapsed && <span className="nav-text">{item.label}</span>}
+                                {item.eventName === 'kasir:open-drafts' && draftCount > 0 && (
+                                    <span className="nav-badge">{draftCount}</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </nav>
 
             <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>

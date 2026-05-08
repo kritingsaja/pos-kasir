@@ -143,6 +143,24 @@ export default function KasirPage() {
     }, []);
 
     useEffect(() => {
+        const openSales = () => setShowLaporanPanel(true);
+        const openDrafts = () => setShowDraftsList(true);
+
+        window.addEventListener('kasir:open-sales', openSales);
+        window.addEventListener('kasir:open-drafts', openDrafts);
+        return () => {
+            window.removeEventListener('kasir:open-sales', openSales);
+            window.removeEventListener('kasir:open-drafts', openDrafts);
+        };
+    }, []);
+
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('kasir:draft-count', {
+            detail: { count: savedDrafts.length },
+        }));
+    }, [savedDrafts.length]);
+
+    useEffect(() => {
         if (!isInitialized) return;
         try {
             localStorage.setItem('pos_cart', JSON.stringify(cart));
@@ -642,30 +660,7 @@ export default function KasirPage() {
 
     return (
         <>
-            <div className={`pos-layout with-side-actions ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
-                {step === 'selection' && (
-                    <div className="kasir-side-actions">
-                        <button
-                            className="btn-side-action sales"
-                            onClick={() => setShowLaporanPanel(true)}
-                            title="Sales"
-                        >
-                            <span className="action-icon">📊</span>
-                            <span className="action-label">Sales</span>
-                        </button>
-                        <button
-                            className="btn-side-action draft"
-                            onClick={() => setShowDraftsList(true)}
-                            title="Draft"
-                        >
-                            <span className="action-icon">📋</span>
-                            <span className="action-label">Draft</span>
-                            {savedDrafts.length > 0 && (
-                                <span className="action-badge">{savedDrafts.length}</span>
-                            )}
-                        </button>
-                    </div>
-                )}
+            <div className={`pos-layout ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
                 {/* STEP 1: PRODUCTS SELECTION */}
                 {step === 'selection' && (
                     <>
