@@ -73,7 +73,7 @@ export default function KasirPage() {
     const [pillBottom, setPillBottom] = useState(20);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-    // Tablet detection (>= 768px)
+    // Tablet/desktop detection. Keep <=768px on the fixed mobile layout.
     const [isTablet, setIsTablet] = useState(false);
 
     useEffect(() => {
@@ -104,9 +104,8 @@ export default function KasirPage() {
             setIsInitialized(true);
         }
 
-        // Tablet detection
         function checkTablet() {
-            setIsTablet(window.innerWidth >= 768);
+            setIsTablet(window.innerWidth > 768);
         }
         checkTablet();
         window.addEventListener('resize', checkTablet);
