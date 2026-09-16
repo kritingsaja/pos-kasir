@@ -55,7 +55,7 @@ export class BluetoothPrinter {
 
   async connect(): Promise<void> {
     sendLog('STEP 1: Mulai koneksi Bluetooth');
-    
+
     try {
       sendLog('STEP 2: Request device...');
       this.device = await navigator.bluetooth.requestDevice({
@@ -67,9 +67,41 @@ export class BluetoothPrinter {
         ]
       });
       sendLog(`STEP 3: Device ditemukan: ${this.device.name}`);
+      localStorage.setItem('pos_last_printer_id', this.device.id);
+      await this.connectToDevice(this.device);
+    } catch (error) {
+      sendLog(`ERROR CONNECT: ${(error as Error).message}`, 'error');
+      throw error;
+    }
+  }
+
+  async connectLastPrinter(): Promise<void> {
+    const bluetooth = navigator.bluetooth as Bluetooth & {
+      getDevices?: () => Promise<BluetoothDevice[]>;
+    };
+
+    if (!bluetooth.getDevices) {
+      throw new Error('Printer terakhir belum bisa diakses. Pilih Cetak Bluetooth sekali untuk menghubungkan printer.');
+    }
+
+    const devices = await bluetooth.getDevices();
+    const savedDeviceId = localStorage.getItem('pos_last_printer_id');
+    const device = devices.find((item) => item.id === savedDeviceId) || devices[0];
+
+    if (!device) {
+      throw new Error('Printer terakhir tidak ditemukan. Hubungkan kembali lewat Cetak Bluetooth.');
+    }
+
+    this.device = device;
+    await this.connectToDevice(device);
+  }
+
+  private async connectToDevice(device: BluetoothDevice): Promise<void> {
+    try {
+      this.characteristic = null;
 
       sendLog('STEP 4: Connect GATT server...');
-      const server = await this.device.gatt!.connect();
+      const server = device.gatt!.connected ? device.gatt! : await device.gatt!.connect();
       sendLog('STEP 5: GATT connected');
 
       sendLog('STEP 6: Get primary services...');
@@ -110,7 +142,6 @@ export class BluetoothPrinter {
 
   disconnect(): void {
     this.device?.gatt?.disconnect();
-    this.device = null;
     this.characteristic = null;
     sendLog('Printer disconnected');
   }
@@ -292,3 +323,4 @@ export class BluetoothPrinter {
 }
 
 export const printer = new BluetoothPrinter();
+

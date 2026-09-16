@@ -125,7 +125,10 @@ export async function initializeDatabase() {
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['nama_toko', 'TOKO SAYA'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['alamat_toko', 'Jl. Contoh No. 123'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['telepon_toko', '08123456789'] },
-      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] }
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['auto_print_bluetooth', 'true'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_date', ''] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_codes', '[]'] }
     ]);
 
     // 3. Default Users
@@ -546,3 +549,4 @@ export async function getTransactionItemsByDate(tanggal: string) {
   });
   return res.rows;
 }
+

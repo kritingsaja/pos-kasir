@@ -13,6 +13,7 @@ export default function PengaturanPage() {
         spreadsheet_id: '',
         telegram_bot_token: '',
         telegram_chat_id: '',
+        auto_print_bluetooth: 'true',
     });
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
@@ -260,6 +261,17 @@ export default function PengaturanPage() {
                                     style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: '14px' }}
                                 />
                             </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '12px', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={settings.auto_print_bluetooth === 'true'}
+                                    onChange={(e) => setSettings({ ...settings, auto_print_bluetooth: e.target.checked ? 'true' : 'false' })}
+                                />
+                                <span>
+                                    <strong style={{ display: 'block', fontSize: '13px' }}>Cetak otomatis ke printer Bluetooth terakhir</strong>
+                                    <small style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Printer harus pernah dipilih manual dari halaman struk.</small>
+                                </span>
+                            </label>
                         </div>
                         <div className="modal-footer">
                             <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -408,3 +420,4 @@ export default function PengaturanPage() {
         </>
     );
 }
+

@@ -4252,3 +4252,146 @@ dialog[open].lp-modal-dialog {
 
   .lp-period-pill { font-size: 12px; padding: 9px 4px; }
 }
+
+/* Kasir: controls added for payment method and daily menu availability. */
+.payment-methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.payment-method {
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.payment-method span,
+.payment-method small {
+  display: block;
+}
+
+.payment-method span {
+  color: var(--text-primary);
+  font-weight: 750;
+}
+
+.payment-method small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.payment-method.active {
+  border-color: var(--brand);
+  background: var(--brand-dim);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.qris-payment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.qris-payment-summary strong {
+  color: var(--success);
+  font-size: 18px;
+}
+
+.product-card.unavailable {
+  opacity: 0.58;
+  filter: grayscale(0.55);
+}
+
+.product-unavailable-label {
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.daily-menu-list {
+  max-height: min(58vh, 480px);
+  overflow-y: auto;
+  padding: 0;
+}
+
+.daily-menu-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+
+.daily-menu-item.selected {
+  background: var(--danger-bg);
+}
+
+.daily-menu-item input {
+  width: 18px;
+  height: 18px;
+}
+
+.daily-menu-copy,
+.daily-menu-copy small {
+  display: block;
+}
+
+.daily-menu-copy small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.daily-menu-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.daily-menu-item.selected .daily-menu-status {
+  color: var(--danger);
+}
+
+.daily-menu-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media (min-width: 768px) {
+  .tablet-pos-layout.keyboard-open {
+    height: calc(var(--pos-viewport-height) - 24px) !important;
+    min-height: 0 !important;
+  }
+
+  .tablet-pos-layout.keyboard-open .tablet-products-col,
+  .tablet-pos-layout.keyboard-open .tablet-cart-sidebar {
+    height: 100% !important;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .daily-menu-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+

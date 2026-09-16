@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { Product, CartItem, Transaction, formatRupiah, calculateItemSubtotal, generateTransactionId, getTodayDate, getCurrentTime } from '@/lib/utils';
 import Receipt from '@/components/Receipt';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 
 export default function KasirPage() {
+    type PaymentMethod = 'tunai' | 'qris';
     const [products, setProducts] = useState<Product[]>([]);
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [step, setStep] = useState<'selection' | 'review' | 'payment' | 'receipt'>('selection');
     const [cart, setCart] = useState<CartItem[]>([]);
     const [bayar, setBayar] = useState<number>(0);
+    const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
     type DraftRow = {
         id: number;
         nama_draft: string;
@@ -32,6 +34,7 @@ export default function KasirPage() {
         nama_pelanggan?: string;
         isDraft?: boolean;
         isKitchen?: boolean;
+        metode_bayar?: PaymentMethod;
     } | null>(null);
     const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
     const [savedDrafts, setSavedDrafts] = useState<DraftRow[]>([]);
@@ -44,6 +47,9 @@ export default function KasirPage() {
     const [selectedCategory, setSelectedCategory] = useState('Semua');
     const [namaPelanggan, setNamaPelanggan] = useState('');
     const [settings, setSettings] = useState<{ [key: string]: string }>({});
+    const [unavailableMenuCodes, setUnavailableMenuCodes] = useState<string[]>([]);
+    const [menuAvailabilityDraft, setMenuAvailabilityDraft] = useState<string[]>([]);
+    const [showUnavailableMenu, setShowUnavailableMenu] = useState(false);
     
     // Fitur: Diskon Keseluruhan
     const [globalDiskon, setGlobalDiskon] = useState<string>('');
@@ -72,6 +78,7 @@ export default function KasirPage() {
     // Mobile: pill & footer stays above keyboard
     const [pillBottom, setPillBottom] = useState(20);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
 
     // Tablet/desktop detection. Keep <=768px on the fixed mobile layout.
     const [isTablet, setIsTablet] = useState(false);
@@ -105,7 +112,7 @@ export default function KasirPage() {
         }
 
         function checkTablet() {
-            setIsTablet(window.innerWidth > 768);
+            setIsTablet(window.innerWidth >= 768);
         }
         checkTablet();
         window.addEventListener('resize', checkTablet);
@@ -119,6 +126,7 @@ export default function KasirPage() {
             const kh = window.innerHeight - vh - vo;
             const validKh = isNaN(kh) ? 0 : Math.max(0, kh);
             setKeyboardHeight(validKh);
+            setVisualViewportHeight(vh);
             setPillBottom(Math.max(20, validKh + 12));
         }
         vv?.addEventListener('resize', onViewportResize);
@@ -144,14 +152,20 @@ export default function KasirPage() {
     useEffect(() => {
         const openSales = () => setShowLaporanPanel(true);
         const openDrafts = () => setShowDraftsList(true);
+        const openUnavailableMenu = () => {
+            setMenuAvailabilityDraft(unavailableMenuCodes);
+            setShowUnavailableMenu(true);
+        };
 
         window.addEventListener('kasir:open-sales', openSales);
         window.addEventListener('kasir:open-drafts', openDrafts);
+        window.addEventListener('kasir:open-menu-availability', openUnavailableMenu);
         return () => {
             window.removeEventListener('kasir:open-sales', openSales);
             window.removeEventListener('kasir:open-drafts', openDrafts);
+            window.removeEventListener('kasir:open-menu-availability', openUnavailableMenu);
         };
-    }, []);
+    }, [unavailableMenuCodes]);
 
     useEffect(() => {
         window.dispatchEvent(new CustomEvent('kasir:draft-count', {
@@ -236,7 +250,19 @@ export default function KasirPage() {
             const res = await fetch('/api/settings');
             const data = await res.json();
             if (data.success) {
-                setSettings(data.data || {});
+                const nextSettings = data.data || {};
+                setSettings(nextSettings);
+                const isCurrentDay = nextSettings.daily_unavailable_menu_date === getTodayDate();
+                if (isCurrentDay) {
+                    try {
+                        const savedCodes = JSON.parse(nextSettings.daily_unavailable_menu_codes || '[]');
+                        setUnavailableMenuCodes(Array.isArray(savedCodes) ? savedCodes.filter((code) => typeof code === 'string') : []);
+                    } catch {
+                        setUnavailableMenuCodes([]);
+                    }
+                } else {
+                    setUnavailableMenuCodes([]);
+                }
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -278,6 +304,10 @@ export default function KasirPage() {
     }, [step]);
 
     function addToCart(product: Product) {
+        if (unavailableMenuCodes.includes(product.kode_barang)) {
+            showToast(`${product.nama_barang} ditandai kosong untuk hari ini.`, 'error');
+            return;
+        }
         setCart((prev) => {
             const existing = prev.find((item) => item.kode_barang === product.kode_barang);
             if (existing) {
@@ -343,6 +373,7 @@ export default function KasirPage() {
     function clearCart() {
         setCart([]);
         setBayar(0);
+        setMetodeBayar('tunai');
         setLoadedDraftId(null);
         setNamaPelanggan('');
         setEditingItem(null);
@@ -406,7 +437,8 @@ export default function KasirPage() {
 
     const diskonTotal = itemDiskonTotal + globalDiskonAmount;
     const total = Math.max(0, subtotal - diskonTotal);
-    const kembalian = bayar - total;
+    const bayarAktif = metodeBayar === 'qris' ? total : bayar;
+    const kembalianAktif = metodeBayar === 'qris' ? 0 : bayarAktif - total;
 
     function showToast(message: string, type: string = 'success') {
         setToast({ message, type });
@@ -492,12 +524,64 @@ export default function KasirPage() {
         }
     }
 
-    async function handleCheckout() {
+    function payDraft(draft: DraftRow) {
+        try {
+            const parsed: unknown = JSON.parse(draft.items);
+            const items = Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+            const itemDiscount = items.reduce((sum, item) => {
+                const price = item.harga_override ?? item.harga_jual;
+                return sum + (price * item.qty - item.subtotal);
+            }, 0);
+            const additionalDiscount = Math.max(0, Number(draft.diskon_total) - itemDiscount);
+
+            setCart(items);
+            setLoadedDraftId(draft.id);
+            setNamaPelanggan(draft.nama_draft);
+            setGlobalTipeDiskon(1);
+            setGlobalDiskon(additionalDiscount > 0 ? String(additionalDiscount) : '');
+            setBayar(0);
+            setMetodeBayar('tunai');
+            setShowDraftsList(false);
+            setSelectedDraftForDetail(null);
+            setStep('payment');
+        } catch (error) {
+            console.error('Error preparing draft payment:', error);
+            showToast('Gagal membuka pembayaran draft!', 'error');
+        }
+    }
+
+    async function saveDailyUnavailableMenu(codes: string[]) {
+        const nextCodes = [...new Set(codes)];
+        try {
+            const res = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    daily_unavailable_menu_date: getTodayDate(),
+                    daily_unavailable_menu_codes: JSON.stringify(nextCodes),
+                }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Gagal menyimpan menu kosong');
+
+            setUnavailableMenuCodes(nextCodes);
+            setCart((currentCart) => currentCart.filter((item) => !nextCodes.includes(item.kode_barang)));
+            setShowUnavailableMenu(false);
+            showToast(nextCodes.length ? `${nextCodes.length} menu ditandai kosong hari ini.` : 'Semua menu tersedia kembali hari ini.');
+        } catch (error) {
+            console.error('Error saving daily unavailable menu:', error);
+            showToast('Gagal menyimpan menu kosong hari ini.', 'error');
+        }
+    }
+
+    async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number) {
         if (cart.length === 0) {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
-        if (bayar < total) {
+        const finalBayar = method === 'qris' ? total : (forcedBayar ?? bayar);
+        const finalKembalian = method === 'qris' ? 0 : finalBayar - total;
+        if (finalBayar < total) {
             showToast('Jumlah bayar kurang!', 'error');
             return;
         }
@@ -514,9 +598,9 @@ export default function KasirPage() {
             subtotal,
             diskon_total: diskonTotal,
             total,
-            bayar,
-            kembalian,
-            metode_bayar: 'tunai',
+            bayar: finalBayar,
+            kembalian: finalKembalian,
+            metode_bayar: method,
             kasir: 'Admin',
             nama_pelanggan: namaPelanggan.trim(),
         };
@@ -550,62 +634,7 @@ export default function KasirPage() {
             });
             showToast(isOnline ? 'Transaksi berhasil disimpan!' : 'Transaksi disimpan offline!');
             clearCart();
-        } catch (error) {
-            console.error('Error saving transaction:', error);
-            showToast('Gagal menyimpan transaksi!', 'error');
-        }
-    }
-
-    async function handleCheckoutWithTotal(forcedTotal: number) {
-        setBayar(forcedTotal);
-        const transactionId = generateTransactionId();
-        const tanggal = getTodayDate();
-        const waktu = getCurrentTime();
-
-        const payload = {
-            id: transactionId,
-            tanggal,
-            waktu,
-            items: cart,
-            subtotal,
-            diskon_total: diskonTotal,
-            total,
-            bayar: forcedTotal,
-            kembalian: 0,
-            metode_bayar: 'tunai',
-            kasir: 'Admin',
-            nama_pelanggan: namaPelanggan.trim(),
-        };
-
-        try {
-            if (!isOnline) {
-                await saveOfflineTransaction(payload);
-            } else {
-                const res = await fetch('/api/transactions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-
-                const data = await res.json();
-                if (!data.success) {
-                    showToast('Gagal menyimpan transaksi: ' + data.error, 'error');
-                    return;
-                }
-            }
-
-            if (loadedDraftId) {
-                await fetch(`/api/drafts/${loadedDraftId}`, { method: 'DELETE' }).catch(() => null);
-                setLoadedDraftId(null);
-                fetchDrafts();
-            }
-            setLastTransaction({
-                ...payload,
-                items: [...cart],
-                diskonTotal,
-            });
-            showToast(isOnline ? 'Transaksi berhasil disimpan!' : 'Transaksi disimpan offline!');
-            clearCart();
+            setStep('receipt');
         } catch (error) {
             console.error('Error saving transaction:', error);
             showToast('Gagal menyimpan transaksi!', 'error');
@@ -659,7 +688,10 @@ export default function KasirPage() {
 
     return (
         <>
-            <div className={`pos-layout ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''}`}>
+            <div
+                className={`pos-layout ${step === 'selection' ? 'step-selection' : ''} ${isTablet && step === 'selection' ? 'tablet-pos-layout' : ''} ${keyboardHeight > 80 ? 'keyboard-open' : ''}`}
+                style={visualViewportHeight ? { '--pos-viewport-height': `${visualViewportHeight}px` } as CSSProperties : undefined}
+            >
                 {/* STEP 1: PRODUCTS SELECTION */}
                 {step === 'selection' && (
                     <>
@@ -700,7 +732,7 @@ export default function KasirPage() {
                                     return (
                                         <div
                                             key={product.id}
-                                            className={`product-card ${quantity > 0 ? 'active' : ''}`}
+                                            className={`product-card ${quantity > 0 ? 'active' : ''} ${unavailableMenuCodes.includes(product.kode_barang) ? 'unavailable' : ''}`}
                                             onClick={() => {
                                                 addToCart(product);
                                                 const searchInput = document.querySelector('.search-bar input') as HTMLInputElement;
@@ -712,6 +744,7 @@ export default function KasirPage() {
                                                 <div className="product-price" style={{ fontSize: '13px', fontWeight: 800, color: 'var(--success)' }}>{formatRupiah(product.harga_jual)}</div>
                                             </div>
                                             {quantity > 0 && <div className="product-badge">{quantity}</div>}
+                                            {unavailableMenuCodes.includes(product.kode_barang) && <div className="product-unavailable-label">Kosong hari ini</div>}
                                         </div>
                                     );
                                 })}
@@ -1129,14 +1162,36 @@ export default function KasirPage() {
                             </div>
 
                             <div className="payment-section">
-                                <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '13px' }}>Uang Cepat</p>
-                                <div className="quick-cash">
-                                    {quickCashAmounts.map((amount) => (
-                                        <button key={amount} onClick={() => setBayar(amount)}>
-                                            {formatRupiah(amount)}
-                                        </button>
-                                    ))}
+                                <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '13px' }}>Metode Pembayaran</p>
+                                <div className="payment-methods" role="radiogroup" aria-label="Metode pembayaran">
+                                    <button
+                                        type="button"
+                                        className={`payment-method ${metodeBayar === 'tunai' ? 'active' : ''}`}
+                                        onClick={() => setMetodeBayar('tunai')}
+                                    >
+                                        <span>Cash</span>
+                                        <small>Uang tunai</small>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`payment-method ${metodeBayar === 'qris' ? 'active' : ''}`}
+                                        onClick={() => setMetodeBayar('qris')}
+                                    >
+                                        <span>QRIS</span>
+                                        <small>Nominal pas</small>
+                                    </button>
                                 </div>
+
+                                {metodeBayar === 'tunai' && <>
+                                    <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Uang Cepat</p>
+                                    <div className="quick-cash">
+                                        {quickCashAmounts.map((amount) => (
+                                            <button key={amount} onClick={() => setBayar(amount)}>
+                                                {formatRupiah(amount)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>}
 
                                 <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nama Pelanggan (Opsional)</p>
                                 <div className="payment-input">
@@ -1148,21 +1203,28 @@ export default function KasirPage() {
                                     />
                                 </div>
 
-                                <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nominal Pembayaran</p>
-                                <div className="payment-input">
-                                    <input
-                                        type="number"
-                                        placeholder="Masukkan jumlah bayar..."
-                                        value={bayar || ''}
-                                        onChange={(e) => setBayar(parseInt(e.target.value) || 0)}
-                                    />
-                                    <button
-                                        className="btn btn-sm btn-secondary"
-                                        onClick={() => setBayar(total)}
-                                    >
-                                        Uang Pas
-                                    </button>
-                                </div>
+                                {metodeBayar === 'tunai' ? <>
+                                    <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nominal Pembayaran</p>
+                                    <div className="payment-input">
+                                        <input
+                                            type="number"
+                                            placeholder="Masukkan jumlah bayar..."
+                                            value={bayar || ''}
+                                            onChange={(e) => setBayar(parseInt(e.target.value) || 0)}
+                                        />
+                                        <button
+                                            className="btn btn-sm btn-secondary"
+                                            onClick={() => setBayar(total)}
+                                        >
+                                            Uang Pas
+                                        </button>
+                                    </div>
+                                </> : (
+                                    <div className="qris-payment-summary">
+                                        <span>Nominal QRIS</span>
+                                        <strong>{formatRupiah(total)}</strong>
+                                    </div>
+                                )}
 
                                 <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Diskon Keseluruhan (Opsional)</p>
                                 <div className="payment-input" style={{ display: 'flex', gap: '8px' }}>
@@ -1189,11 +1251,11 @@ export default function KasirPage() {
                                     </div>
                                 </div>
 
-                                {bayar > 0 && (
+                                {bayarAktif > 0 && (
                                     <div className="kembalian-row" style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
-                                        <span>Kembalian</span>
-                                        <span className="kembalian-value" style={{ color: kembalian >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '20px' }}>
-                                            {formatRupiah(Math.max(0, kembalian))}
+                                        <span>{metodeBayar === 'qris' ? 'Pembayaran QRIS' : 'Kembalian'}</span>
+                                        <span className="kembalian-value" style={{ color: kembalianAktif >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '20px' }}>
+                                            {metodeBayar === 'qris' ? 'Pas' : formatRupiah(Math.max(0, kembalianAktif))}
                                         </span>
                                     </div>
                                 )}
@@ -1202,16 +1264,9 @@ export default function KasirPage() {
                                     <button
                                         className="btn btn-success btn-lg"
                                         style={{ width: '100%' }}
-                                        onClick={() => {
-                                            if (bayar < total) {
-                                                handleCheckoutWithTotal(total);
-                                            } else {
-                                                handleCheckout();
-                                            }
-                                            setStep('receipt');
-                                        }}
+                                        onClick={() => void handleCheckout(metodeBayar)}
                                     >
-                                        💵 Bayar & Simpan
+                                        {metodeBayar === 'qris' ? 'QRIS Dibayar & Simpan' : 'Bayar & Simpan'}
                                     </button>
                                     <button
                                         className="btn btn-secondary"
@@ -1226,6 +1281,47 @@ export default function KasirPage() {
                     </div>
                 )}
             </div>
+
+            {showUnavailableMenu && (
+                <div className="modal-overlay" onClick={() => setShowUnavailableMenu(false)}>
+                    <div className="modal daily-menu-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '95%' }}>
+                        <div className="modal-header">
+                            <div>
+                                <h2 style={{ margin: 0 }}>Menu Kosong Hari Ini</h2>
+                                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '12px' }}>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                            </div>
+                            <button className="modal-close" onClick={() => setShowUnavailableMenu(false)}>X</button>
+                        </div>
+                        <div className="modal-body daily-menu-list">
+                            {products.map((product) => {
+                                const isUnavailable = menuAvailabilityDraft.includes(product.kode_barang);
+                                return (
+                                    <label key={product.id} className={`daily-menu-item ${isUnavailable ? 'selected' : ''}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isUnavailable}
+                                            onChange={() => setMenuAvailabilityDraft((current) => (
+                                                isUnavailable
+                                                    ? current.filter((code) => code !== product.kode_barang)
+                                                    : [...current, product.kode_barang]
+                                            ))}
+                                        />
+                                        <span className="daily-menu-copy">
+                                            <strong>{product.nama_barang}</strong>
+                                            <small>{formatRupiah(product.harga_jual)}</small>
+                                        </span>
+                                        <span className="daily-menu-status">{isUnavailable ? 'Kosong' : 'Tersedia'}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        <div className="modal-footer daily-menu-footer">
+                            <button className="btn btn-secondary" onClick={() => setMenuAvailabilityDraft([])}>Buka Semua</button>
+                            <button className="btn btn-primary" onClick={() => void saveDailyUnavailableMenu(menuAvailabilityDraft)}>Simpan Hari Ini</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Saved Drafts List Modal */}
             {showDraftsList && (
@@ -1321,6 +1417,9 @@ export default function KasirPage() {
                                             setSelectedDraftForDetail(null);
                                         }}>
                                             ✏️ Edit Order
+                                        </button>
+                                        <button className="btn btn-success" onClick={() => payDraft(selectedDraftForDetail!)}>
+                                            Bayar Draft
                                         </button>
                                         <button className="btn btn-accent" onClick={() => handlePrintDraft(false, { ...selectedDraftForDetail!, items: JSON.parse(selectedDraftForDetail!.items) })}>
                                             👤 Print Customer
@@ -1418,7 +1517,7 @@ export default function KasirPage() {
                                         total={lastTransaction.total}
                                         bayar={lastTransaction.bayar}
                                         kembalian={lastTransaction.kembalian}
-                                        metodeBayar="Tunai"
+                                        metodeBayar={lastTransaction.metode_bayar === 'qris' ? 'QRIS' : 'Tunai'}
                                         nama_pelanggan={lastTransaction.nama_pelanggan}
                                         namaToko={settings.nama_toko}
                                         alamatToko={settings.alamat_toko}
@@ -1427,6 +1526,7 @@ export default function KasirPage() {
                                         footerNota={settings.footer_nota}
                                         isDraft={lastTransaction.isDraft}
                                         isKitchen={lastTransaction.isKitchen}
+                                        autoPrint={settings.auto_print_bluetooth === 'true' && !lastTransaction.isDraft}
                                     />
                                 </div>
                             )}
@@ -1563,3 +1663,4 @@ export default function KasirPage() {
         </>
     );
 }
+

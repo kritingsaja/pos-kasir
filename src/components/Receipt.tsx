@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CartItem } from '@/lib/utils';
 import { printer } from '@/lib/bluetooth-printer';
 import type { PrintKitchenData, PrintReceiptData } from '@/lib/bluetooth-printer';
@@ -25,6 +25,7 @@ interface ReceiptProps {
     waktu?: string;
     isDraft?: boolean;
     isKitchen?: boolean;
+    autoPrint?: boolean;
 }
 
 function formatRp(n: number) {
@@ -51,9 +52,11 @@ export default function Receipt({
     waktu: propWaktu,
     isDraft = false,
     isKitchen = false,
+    autoPrint = false,
 }: ReceiptProps) {
     const [btStatus, setBtStatus] = useState<'idle' | 'connecting' | 'printing' | 'done' | 'error'>('idle');
     const [btMessage, setBtMessage] = useState('');
+    const autoPrintedTransaction = useRef<string | null>(null);
 
     const now = new Date();
     const currentTanggal = now.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -64,7 +67,7 @@ export default function Receipt({
 
     const handlePrint = () => window.print();
 
-    const handleBluetoothPrint = async () => {
+    const printBluetooth = async (useLastPrinter: boolean) => {
         if (!('bluetooth' in navigator)) {
             setBtMessage('Browser tidak support Bluetooth. Gunakan Chrome Android.');
             setBtStatus('error');
@@ -73,8 +76,12 @@ export default function Receipt({
         try {
             if (!printer.isConnected()) {
                 setBtStatus('connecting');
-                setBtMessage('Menghubungkan ke printer...');
-                await printer.connect();
+                setBtMessage(useLastPrinter ? 'Menghubungkan ke printer terakhir...' : 'Menghubungkan ke printer...');
+                if (useLastPrinter) {
+                    await printer.connectLastPrinter();
+                } else {
+                    await printer.connect();
+                }
             }
             setBtStatus('printing');
             setBtMessage('Mencetak...');
@@ -109,6 +116,16 @@ export default function Receipt({
             setTimeout(() => { setBtStatus('idle'); setBtMessage(''); }, 4000);
         }
     };
+
+    const handleBluetoothPrint = async () => printBluetooth(false);
+
+    useEffect(() => {
+        if (!autoPrint || isDraft || isKitchen || autoPrintedTransaction.current === transactionId) return;
+        autoPrintedTransaction.current = transactionId;
+        void printBluetooth(true);
+        // Hanya cetak sekali untuk setiap struk yang selesai dibuat.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoPrint, isDraft, isKitchen, transactionId]);
 
     const handleBluetoothKitchenPrint = async () => {
         if (!('bluetooth' in navigator)) {

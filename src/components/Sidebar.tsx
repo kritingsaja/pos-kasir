@@ -17,6 +17,7 @@ const navItems = [
 const kasirActionItems = [
     { eventName: 'kasir:open-sales', icon: '📊', label: 'Sales' },
     { eventName: 'kasir:open-drafts', icon: '📋', label: 'Draft' },
+    { eventName: 'kasir:open-menu-availability', icon: '🚫', label: 'Menu Kosong' },
 ];
 
 interface SidebarProps {
@@ -162,3 +163,4 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
         </aside>
     );
 }
+
