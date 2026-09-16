@@ -8,12 +8,19 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value;
     const path = request.nextUrl.pathname;
 
+    // PWA resources must remain public even when a session is expired.
+    const isPwaResource = path === '/sw.js' || path === '/manifest.json' ||
+        /^\/(?:workbox|worker|swe-worker)-[a-zA-Z0-9_-]+\.js$/.test(path) ||
+        /^\/icons\/[^/]+\.png$/.test(path);
+    if (isPwaResource) return NextResponse.next();
+
     // Root or login page should not be protected right here if the intent is to redirect
     // But actually let's just make it simple:
     const isLoginPage = path === '/login';
     const isBosPage = path === '/bos' || path.startsWith('/api/bos');
     const isAuthApi = path.startsWith('/api/auth/');
-    const isPublicAsset = path.match(/\.(png|jpg|jpeg|gif|svg|ico|json|webmanifest)$/i) || path === '/manifest.ts';
+    const isPublicAsset = !path.startsWith('/api/') &&
+        (path.match(/\.(png|jpg|jpeg|gif|svg|ico|json|webmanifest)$/i) || path === '/manifest.ts');
 
     if (!token && !isLoginPage && !isBosPage && !isAuthApi && !isPublicAsset) {
         if (path.startsWith('/api/')) {
