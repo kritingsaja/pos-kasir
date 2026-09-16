@@ -50,6 +50,7 @@ export default function KasirPage() {
     const [unavailableMenuCodes, setUnavailableMenuCodes] = useState<string[]>([]);
     const [menuAvailabilityDraft, setMenuAvailabilityDraft] = useState<string[]>([]);
     const [showUnavailableMenu, setShowUnavailableMenu] = useState(false);
+    const [dailyMenuSearch, setDailyMenuSearch] = useState('');
     
     // Fitur: Diskon Keseluruhan
     const [globalDiskon, setGlobalDiskon] = useState<string>('');
@@ -154,6 +155,7 @@ export default function KasirPage() {
         const openDrafts = () => setShowDraftsList(true);
         const openUnavailableMenu = () => {
             setMenuAvailabilityDraft(unavailableMenuCodes);
+            setDailyMenuSearch('');
             setShowUnavailableMenu(true);
         };
 
@@ -642,6 +644,12 @@ export default function KasirPage() {
     }
 
     const quickCashAmounts = [5000, 10000, 20000, 50000, 100000, 200000];
+    const filteredDailyMenuProducts = products.filter((product) => {
+        const query = dailyMenuSearch.trim().toLowerCase();
+        return !query
+            || product.nama_barang.toLowerCase().includes(query)
+            || product.kode_barang.toLowerCase().includes(query);
+    });
 
     // Laporan totals
     const laporanTotal = laporanTransactions.reduce((s, t) => s + t.total, 0);
@@ -857,9 +865,9 @@ export default function KasirPage() {
                                                         <div className="cart-item-actions-group">
                                                             <button
                                                                 className="cart-item-action-btn"
-                                                                title="Edit harga/diskon"
+                                                                title="Atur harga dan diskon"
                                                                 onClick={() => isEditing ? setEditingItem(null) : startEditItem(item)}
-                                                            >✏️</button>
+                                                            >💲</button>
                                                             <button
                                                                 className="cart-item-action-btn"
                                                                 title="Tambah catatan"
@@ -1032,10 +1040,10 @@ export default function KasirPage() {
                                                     <div className="cart-item-actions-group">
                                                         <button
                                                             className="cart-item-action-btn"
-                                                            title="Edit harga/diskon"
+                                                            title="Atur harga dan diskon"
                                                             onClick={() => isEditing ? setEditingItem(null) : startEditItem(item)}
                                                         >
-                                                            ✏️
+                                                            💲
                                                         </button>
                                                         <button
                                                             className="cart-item-action-btn"
@@ -1292,8 +1300,18 @@ export default function KasirPage() {
                             </div>
                             <button className="modal-close" onClick={() => setShowUnavailableMenu(false)}>X</button>
                         </div>
+                        <div className="daily-menu-search">
+                            <span aria-hidden="true">🔍</span>
+                            <input
+                                type="search"
+                                placeholder="Cari nama atau kode menu..."
+                                value={dailyMenuSearch}
+                                onChange={(e) => setDailyMenuSearch(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
                         <div className="modal-body daily-menu-list">
-                            {products.map((product) => {
+                            {filteredDailyMenuProducts.map((product) => {
                                 const isUnavailable = menuAvailabilityDraft.includes(product.kode_barang);
                                 return (
                                     <label key={product.id} className={`daily-menu-item ${isUnavailable ? 'selected' : ''}`}>
@@ -1314,6 +1332,11 @@ export default function KasirPage() {
                                     </label>
                                 );
                             })}
+                            {filteredDailyMenuProducts.length === 0 && (
+                                <div className="empty-state" style={{ padding: '36px 16px' }}>
+                                    <p>Menu tidak ditemukan</p>
+                                </div>
+                            )}
                         </div>
                         <div className="modal-footer daily-menu-footer">
                             <button className="btn btn-secondary" onClick={() => setMenuAvailabilityDraft([])}>Buka Semua</button>

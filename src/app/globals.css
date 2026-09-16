@@ -4328,6 +4328,22 @@ dialog[open].lp-modal-dialog {
   padding: 0;
 }
 
+.daily-menu-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+}
+
+.daily-menu-search input {
+  min-width: 0;
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+}
+
 .daily-menu-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
