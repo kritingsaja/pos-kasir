@@ -1,13 +1,16 @@
 {
+  "id": "/kasir",
   "name": "KasirPOS Baco Coffee",
   "short_name": "KasirPOS",
   "description": "Aplikasi Kasir Modern untuk Coffee Shop",
-  "id": "/kasir",
   "start_url": "/kasir",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#7c5c3e",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -19,7 +22,13 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
