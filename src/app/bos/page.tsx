@@ -1,12 +1,13 @@
 import { getTodayStats } from '@/lib/db';
+import { getTodayPaymentStats } from '@/lib/todayPaymentStats';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BosPage() {
-  const stats = await getTodayStats();
-  const cash = Number(stats?.total_cash || 0);
-  const qris = Number(stats?.total_qris || 0);
+  const [stats, paymentStats] = await Promise.all([getTodayStats(), getTodayPaymentStats()]);
+  const cash = paymentStats.cash;
+  const qris = paymentStats.qris;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4">
