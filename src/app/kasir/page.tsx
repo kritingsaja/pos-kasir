@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { Product, CartItem, Transaction, formatRupiah, calculateItemSubtotal, generateTransactionId, getTodayDate, getCurrentTime } from '@/lib/utils';
 import Receipt from '@/components/Receipt';
+import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 
@@ -57,7 +58,7 @@ export default function KasirPage() {
     const [globalDiskon, setGlobalDiskon] = useState<string>('');
     const [globalTipeDiskon, setGlobalTipeDiskon] = useState<0 | 1>(1); // 0=persen, 1=rupiah
 
-    const { isOnline, saveOfflineTransaction } = useOfflineSync();
+    const { isOnline, pendingCount, saveOfflineTransaction } = useOfflineSync();
 
     const [isInitialized, setIsInitialized] = useState(false);
 
@@ -72,6 +73,8 @@ export default function KasirPage() {
 
     // Fitur 3: Panel laporan kasir
     const [showLaporanPanel, setShowLaporanPanel] = useState(false);
+    const [showClosing, setShowClosing] = useState(false);
+    const closeClosing = useCallback(() => setShowClosing(false), []);
     const [laporanTransactions, setLaporanTransactions] = useState<Transaction[]>([]);
     const [laporanLoading, setLaporanLoading] = useState(false);
     const [laporanDate, setLaporanDate] = useState(new Date().toISOString().split('T')[0]);
@@ -153,6 +156,12 @@ export default function KasirPage() {
 
     useEffect(() => {
         const openSales = () => setShowLaporanPanel(true);
+        const openClosing = () => {
+            setShowLaporanPanel(false);
+            setShowDraftsList(false);
+            setShowUnavailableMenu(false);
+            setShowClosing(true);
+        };
         const openDrafts = () => setShowDraftsList(true);
         const openUnavailableMenu = () => {
             setMenuAvailabilityDraft(unavailableMenuCodes);
@@ -161,10 +170,12 @@ export default function KasirPage() {
         };
 
         window.addEventListener('kasir:open-sales', openSales);
+        window.addEventListener('kasir:open-closing', openClosing);
         window.addEventListener('kasir:open-drafts', openDrafts);
         window.addEventListener('kasir:open-menu-availability', openUnavailableMenu);
         return () => {
             window.removeEventListener('kasir:open-sales', openSales);
+            window.removeEventListener('kasir:open-closing', openClosing);
             window.removeEventListener('kasir:open-drafts', openDrafts);
             window.removeEventListener('kasir:open-menu-availability', openUnavailableMenu);
         };
@@ -1578,6 +1589,8 @@ export default function KasirPage() {
                     </div>
                 </div>
             )}
+
+            {showClosing && <ClosingSummary isOnline={isOnline} pendingCount={pendingCount} onClose={closeClosing} />}
 
             {/* ── Fitur 3: Panel Laporan Kasir ── */}
             {showLaporanPanel && (

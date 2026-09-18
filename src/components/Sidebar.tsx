@@ -15,6 +15,7 @@ const navItems = [
 ];
 
 const kasirActionItems = [
+    { eventName: 'kasir:open-closing', icon: '🏁', label: 'Closing' },
     { eventName: 'kasir:open-sales', icon: '📊', label: 'Sales' },
     { eventName: 'kasir:open-drafts', icon: '📋', label: 'Draft' },
     { eventName: 'kasir:open-menu-availability', icon: '🚫', label: 'Menu Kosong' },
@@ -163,4 +164,3 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
         </aside>
     );
 }
-
