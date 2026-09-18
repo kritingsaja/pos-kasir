@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { Product, CartItem, Transaction, formatRupiah, calculateItemSubtotal, generateTransactionId, getTodayDate, getCurrentTime } from '@/lib/utils';
 import Receipt from '@/components/Receipt';
 import { useOfflineSync } from '@/lib/useOfflineSync';
+import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 
 export default function KasirPage() {
     type PaymentMethod = 'tunai' | 'qris';
@@ -12,7 +13,7 @@ export default function KasirPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [step, setStep] = useState<'selection' | 'review' | 'payment' | 'receipt'>('selection');
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [bayar, setBayar] = useState<number>(0);
+    const [bayar, setBayar] = useState<number | null>(null);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
     type DraftRow = {
         id: number;
@@ -374,7 +375,7 @@ export default function KasirPage() {
 
     function clearCart() {
         setCart([]);
-        setBayar(0);
+        setBayar(null);
         setMetodeBayar('tunai');
         setLoadedDraftId(null);
         setNamaPelanggan('');
@@ -439,7 +440,7 @@ export default function KasirPage() {
 
     const diskonTotal = itemDiskonTotal + globalDiskonAmount;
     const total = Math.max(0, subtotal - diskonTotal);
-    const bayarAktif = metodeBayar === 'qris' ? total : bayar;
+    const bayarAktif = metodeBayar === 'qris' ? total : getCashReceived(total, bayar);
     const kembalianAktif = metodeBayar === 'qris' ? 0 : bayarAktif - total;
 
     function showToast(message: string, type: string = 'success') {
@@ -541,7 +542,7 @@ export default function KasirPage() {
             setNamaPelanggan(draft.nama_draft);
             setGlobalTipeDiskon(1);
             setGlobalDiskon(additionalDiscount > 0 ? String(additionalDiscount) : '');
-            setBayar(0);
+            setBayar(null);
             setMetodeBayar('tunai');
             setShowDraftsList(false);
             setSelectedDraftForDetail(null);
@@ -581,7 +582,7 @@ export default function KasirPage() {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
-        const finalBayar = method === 'qris' ? total : (forcedBayar ?? bayar);
+        const finalBayar = method === 'qris' ? total : getCashReceived(total, forcedBayar ?? bayar);
         const finalKembalian = method === 'qris' ? 0 : finalBayar - total;
         if (finalBayar < total) {
             showToast('Jumlah bayar kurang!', 'error');
@@ -643,7 +644,7 @@ export default function KasirPage() {
         }
     }
 
-    const quickCashAmounts = [5000, 10000, 20000, 50000, 100000, 200000];
+    const quickCashAmounts = getQuickCashAmounts(total);
     const filteredDailyMenuProducts = products.filter((product) => {
         const query = dailyMenuSearch.trim().toLowerCase();
         return !query
@@ -1212,13 +1213,13 @@ export default function KasirPage() {
                                 </div>
 
                                 {metodeBayar === 'tunai' ? <>
-                                    <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nominal Pembayaran</p>
+                                    <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nominal Pembayaran (Opsional)</p>
                                     <div className="payment-input">
                                         <input
                                             type="number"
                                             placeholder="Masukkan jumlah bayar..."
-                                            value={bayar || ''}
-                                            onChange={(e) => setBayar(parseInt(e.target.value) || 0)}
+                                            value={bayar ?? ''}
+                                            onChange={(e) => setBayar(e.target.value === '' ? null : (parseInt(e.target.value, 10) || 0))}
                                         />
                                         <button
                                             className="btn btn-sm btn-secondary"
@@ -1686,4 +1687,3 @@ export default function KasirPage() {
         </>
     );
 }
-
