@@ -290,7 +290,22 @@ export async function deleteProduct(id: number) {
 }
 
 // Transactions
-export async function addTransaction(t: any) {
+interface TransactionInput {
+  id: string;
+  tanggal: string;
+  waktu: string;
+  items: string;
+  subtotal: number;
+  diskon_total: number;
+  total: number;
+  bayar: number;
+  kembalian: number;
+  metode_bayar: string;
+  kasir?: string;
+  nama_pelanggan?: string;
+}
+
+export async function addTransaction(t: TransactionInput) {
   const db = getDb();
   return await db.execute({
     sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan)
@@ -301,6 +316,21 @@ export async function addTransaction(t: any) {
       t.kasir || 'Admin', t.nama_pelanggan || ''
     ]
   });
+}
+
+export async function addTransactionIdempotent(t: TransactionInput): Promise<boolean> {
+  const db = getDb();
+  const result = await db.execute({
+    sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO NOTHING`,
+    args: [
+      t.id, t.tanggal, t.waktu, t.items, t.subtotal, t.diskon_total,
+      t.total, t.bayar, t.kembalian, t.metode_bayar,
+      t.kasir || 'Admin', t.nama_pelanggan || ''
+    ]
+  });
+  return result.rowsAffected > 0;
 }
 
 export async function deleteTransaction(id: string) {
@@ -549,4 +579,3 @@ export async function getTransactionItemsByDate(tanggal: string) {
   });
   return res.rows;
 }
-

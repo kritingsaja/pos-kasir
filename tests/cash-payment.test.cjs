@@ -45,7 +45,7 @@ function text(tree) {
     return typeof tree === 'object' ? text(tree.props?.children) : String(tree);
 }
 
-function cashier({ amount = null, method = 'tunai', online = true, discount = '' } = {}) {
+function cashier({ amount = null, method = 'tunai', online = true, discount = '', deferSave = false, saveSucceeds = true } = {}) {
     const source = readFileSync(resolve(__dirname, '../src/app/kasir/page.tsx'), 'utf8');
     const ast = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const stateNames = [];
@@ -64,7 +64,10 @@ function cashier({ amount = null, method = 'tunai', online = true, discount = ''
             qty: 1, diskon: 0, tipe_diskon: 1, subtotal: 72000 }],
     };
     let index = 0;
+    let refIndex = 0;
+    const refs = [];
     const saved = [];
+    let releaseSave;
     const react = {
         useState(initial) {
             const name = stateNames[index++];
@@ -72,6 +75,11 @@ function cashier({ amount = null, method = 'tunai', online = true, discount = ''
             return [state[name], (value) => { state[name] = typeof value === 'function' ? value(state[name]) : value; }];
         },
         useEffect() {}, useCallback: (callback) => callback,
+        useRef(initial) {
+            const slot = refIndex++;
+            if (!refs[slot]) refs[slot] = { current: initial };
+            return refs[slot];
+        },
     };
     const { default: Page } = loadModule('src/app/kasir/page.tsx', {
         react, 'react/jsx-runtime': require('react/jsx-runtime'), '@/lib/utils': utils,
@@ -83,12 +91,13 @@ function cashier({ amount = null, method = 'tunai', online = true, discount = ''
         fetch: async (url, options) => {
             assert.equal(url, '/api/transactions');
             saved.push(JSON.parse(options.body));
-            return { json: async () => ({ success: true }) };
+            if (deferSave) await new Promise((resolve) => { releaseSave = resolve; });
+            return { json: async () => ({ success: saveSucceeds, error: saveSucceeds ? undefined : 'gagal' }) };
         },
         setTimeout: () => 0,
         localStorage: { removeItem() {} },
     });
-    function render() { index = 0; return Page(); }
+    function render() { index = 0; refIndex = 0; return Page(); }
     function input(tree) {
         return nodes(tree, (node) => node.type === 'input' && node.props.placeholder === 'Masukkan jumlah bayar...')[0];
     }
@@ -100,8 +109,35 @@ function cashier({ amount = null, method = 'tunai', online = true, discount = ''
         button.props.onClick();
         await new Promise((done) => setImmediate(done));
     }
-    return { render, input, checkout, saved, state };
+    return { render, input, checkout, saved, state, releaseSave: () => releaseSave?.() };
 }
+
+test('three rapid checkout taps create only one transaction and lock the button', async () => {
+    const app = cashier({ deferSave: true });
+    const tree = app.render();
+    const button = nodes(tree, (node) => node.type === 'button' && text(node) === 'Bayar & Simpan')[0];
+    button.props.onClick();
+    button.props.onClick();
+    button.props.onClick();
+    await Promise.resolve();
+    assert.equal(app.saved.length, 1);
+    const locked = nodes(app.render(), (node) => node.type === 'button' && text(node) === 'Menyimpan...')[0];
+    assert.ok(locked.props.disabled);
+    assert.equal(locked.props['aria-busy'], true);
+    app.releaseSave();
+    await new Promise((done) => setImmediate(done));
+    assert.equal(app.state.step, 'receipt');
+});
+
+test('failed checkout unlocks the button so the cashier can retry', async () => {
+    const app = cashier({ saveSucceeds: false });
+    await app.checkout(app.render());
+    const retry = nodes(app.render(), (node) => node.type === 'button' && text(node) === 'Bayar & Simpan')[0];
+    assert.equal(retry.props.disabled, false);
+    retry.props.onClick();
+    await new Promise((done) => setImmediate(done));
+    assert.equal(app.saved.length, 2);
+});
 
 test('blank cash checks out as exact payment online and offline', async () => {
     for (const online of [true, false]) {

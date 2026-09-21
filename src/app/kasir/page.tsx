@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
 import { Product, CartItem, Transaction, formatRupiah, calculateItemSubtotal, generateTransactionId, getTodayDate, getCurrentTime } from '@/lib/utils';
 import Receipt from '@/components/Receipt';
 import ClosingSummary from '@/components/ClosingSummary';
@@ -15,6 +15,8 @@ export default function KasirPage() {
     const [step, setStep] = useState<'selection' | 'review' | 'payment' | 'receipt'>('selection');
     const [cart, setCart] = useState<CartItem[]>([]);
     const [bayar, setBayar] = useState<number | null>(null);
+    const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
+    const checkoutLock = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
     type DraftRow = {
         id: number;
@@ -589,6 +591,7 @@ export default function KasirPage() {
     }
 
     async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number) {
+        if (checkoutLock.current) return;
         if (cart.length === 0) {
             showToast('Keranjang masih kosong!', 'error');
             return;
@@ -599,6 +602,9 @@ export default function KasirPage() {
             showToast('Jumlah bayar kurang!', 'error');
             return;
         }
+
+        checkoutLock.current = true;
+        setIsCheckoutSubmitting(true);
 
         const transactionId = generateTransactionId();
         const tanggal = getTodayDate();
@@ -652,6 +658,9 @@ export default function KasirPage() {
         } catch (error) {
             console.error('Error saving transaction:', error);
             showToast('Gagal menyimpan transaksi!', 'error');
+        } finally {
+            checkoutLock.current = false;
+            setIsCheckoutSubmitting(false);
         }
     }
 
@@ -1285,8 +1294,10 @@ export default function KasirPage() {
                                         className="btn btn-success btn-lg"
                                         style={{ width: '100%' }}
                                         onClick={() => void handleCheckout(metodeBayar)}
+                                        disabled={isCheckoutSubmitting}
+                                        aria-busy={isCheckoutSubmitting}
                                     >
-                                        {metodeBayar === 'qris' ? 'QRIS Dibayar & Simpan' : 'Bayar & Simpan'}
+                                        {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'QRIS Dibayar & Simpan' : 'Bayar & Simpan')}
                                     </button>
                                     <button
                                         className="btn btn-secondary"

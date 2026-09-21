@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addTransaction, getTransactionsByDate, getTransactionsRange, getTodayStats, getTopProducts } from '@/lib/db';
-import { seedProducts } from '@/lib/seed';
+import { addTransactionIdempotent, getTransactionsByDate, getTransactionsRange, getTodayStats, getTopProducts } from '@/lib/db';
 
 export async function GET(request: Request) {
     try {
@@ -45,7 +44,7 @@ export async function POST(request: Request) {
             );
         }
 
-        await addTransaction({
+        const inserted = await addTransactionIdempotent({
             id,
             tanggal,
             waktu: waktu || new Date().toLocaleTimeString('id-ID'),
@@ -60,7 +59,11 @@ export async function POST(request: Request) {
             nama_pelanggan: nama_pelanggan || '',
         });
 
-        return NextResponse.json({ success: true, message: 'Transaksi berhasil disimpan' });
+        return NextResponse.json({
+            success: true,
+            duplicate: !inserted,
+            message: inserted ? 'Transaksi berhasil disimpan' : 'Transaksi sudah tersimpan sebelumnya',
+        });
     } catch (error) {
         console.error('Error saving transaction:', error);
         return NextResponse.json({ success: false, error: 'Gagal menyimpan transaksi' }, { status: 500 });
