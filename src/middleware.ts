@@ -8,6 +8,9 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value;
     const path = request.nextUrl.pathname;
 
+    // External endpoints authenticate their own scoped Bearer keys.
+    if (path === '/api/v1/menu' || path === '/api/v1/orders') return NextResponse.next();
+
     // PWA resources must remain public even when a session is expired.
     const isPwaResource = path === '/sw.js' || path === '/manifest.json' ||
         /^\/(?:workbox|worker|swe-worker)-[a-zA-Z0-9_-]+\.js$/.test(path) ||

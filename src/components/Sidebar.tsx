@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { KeyRound } from 'lucide-react';
 
 const navItems = [
     { href: '/', icon: '📊', label: 'Dashboard', access: ['Admin'] },
@@ -11,6 +12,7 @@ const navItems = [
     { href: '/produk', icon: '📦', label: 'Produk', access: ['Admin'] },
     { href: '/bahan-baku', icon: '🧪', label: 'Bahan Baku', access: ['Admin'] },
     { href: '/laporan', icon: '📋', label: 'Laporan', access: ['Admin'] },
+    { href: '/akses-api', icon: <KeyRound size={19} />, label: 'Akses API', access: ['Admin'] },
     { href: '/pengaturan', icon: '⚙️', label: 'Pengaturan', access: ['Admin'] },
 ];
 

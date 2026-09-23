@@ -184,6 +184,11 @@ export default function KasirPage() {
     }, [unavailableMenuCodes]);
 
     useEffect(() => {
+        // Drafts can also arrive from integrations while the cashier stays open.
+        if (showDraftsList) void fetchDrafts();
+    }, [showDraftsList]);
+
+    useEffect(() => {
         window.dispatchEvent(new CustomEvent('kasir:draft-count', {
             detail: { count: savedDrafts.length },
         }));
