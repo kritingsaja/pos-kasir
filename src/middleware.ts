@@ -8,6 +8,10 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value;
     const path = request.nextUrl.pathname;
 
+    // Reauthentication must work even when a previous cookie was signed with an old secret.
+    // Login validates credentials in its route; logout only clears the session cookie.
+    if (path === '/api/auth/login' || path === '/api/auth/logout') return NextResponse.next();
+
     // External endpoints authenticate their own scoped Bearer keys.
     if (path === '/api/v1/menu' || path === '/api/v1/orders') return NextResponse.next();
 

@@ -13,6 +13,8 @@ Endpoint: `/api/cek-mutasi-bca`, Next.js App Router, Node.js, maksimal 120 detik
 
 Konfirmasi manual tetap tersedia saat pengecekan portal belum tersedia. Pembayaran terverifikasi BCA harus disimpan online; endpoint transaksi memvalidasi claim dan membukukan penjualan serta referensi dalam satu transaksi database.
 
+Mengaktifkan JWT_SECRET pada Preview membatalkan sesi yang sebelumnya memakai fallback. Endpoint login dan logout tetap dapat diakses ketika cookie lama tidak valid, sehingga pengguna dapat login ulang tanpa menghapus data kasir atau mengganti password. Endpoint lain tetap memvalidasi sesi.
+
 ## Jika tombol cek tidak bereaksi
 
 Tombol sekarang selalu memberi pesan ketika ditekan, kecuali sedang memproses atau QRIS sudah terverifikasi. Status konfigurasi mempunyai timeout 12 detik dan diperiksa ulang setiap klik. Respons non-JSON, sesi kasir berakhir, akses preview ditolak, serta konfigurasi belum lengkap ditampilkan sebagai pesan.
