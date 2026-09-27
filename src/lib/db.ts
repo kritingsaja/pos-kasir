@@ -325,8 +325,7 @@ export async function addTransaction(t: TransactionInput) {
   });
 }
 
-export async function addTransactionIdempotent(t: TransactionInput): Promise<boolean> {
-  const db = getDb();
+export async function addTransactionIdempotent(t: TransactionInput, db: Pick<Client, 'execute'> = getDb()): Promise<boolean> {
   const result = await db.execute({
     sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, rincian_bayar, kasir, nama_pelanggan)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

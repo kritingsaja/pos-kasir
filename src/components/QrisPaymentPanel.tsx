@@ -58,7 +58,7 @@ export default function QrisPaymentPanel({ staticPayload, amount, onReady }: Qri
             </div>
             <div className="qris-verification-note">
                 <ShieldCheck size={18} aria-hidden="true" />
-                <p>Periksa pembayaran di BCA, lalu konfirmasi di kasir.</p>
+                <p>Tekan Cek Pembayaran QRIS di kasir, atau periksa BCA untuk konfirmasi manual.</p>
             </div>
         </section>
     );

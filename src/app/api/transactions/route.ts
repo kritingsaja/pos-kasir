@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { addTransactionIdempotent, getTransactionsByDate, getTransactionsRange, getTodayStats, getTopProducts } from '@/lib/db';
+import { addTransactionIdempotent, getDb, getTransactionsByDate, getTransactionsRange, getTodayStats, getTopProducts } from '@/lib/db';
 import { QRIS_MAX_TRANSACTION_AMOUNT } from '@/lib/qris';
+import { authenticatedBcaUser, claimForSale, errorResponse } from '@/lib/bca-check';
+import { BcaError } from '@/lib/bca-matching';
 
 export async function GET(request: Request) {
     try {
@@ -46,6 +48,8 @@ export async function POST(request: Request) {
         }
 
         let paymentBreakdown = '';
+        let qrisPortion = 0;
+        let cashPortion = 0;
         if (rincian_bayar !== undefined) {
             if (typeof rincian_bayar !== 'string' || !Number.isSafeInteger(Number(total)) || Number(total) < 0) {
                 return NextResponse.json({ success: false, error: 'Rincian pembayaran tidak valid' }, { status: 400 });
@@ -68,9 +72,11 @@ export async function POST(request: Request) {
                 || (metode_bayar === 'campuran' && qris > 0 && cash > 0);
             if (!validMethod) return NextResponse.json({ success: false, error: 'Metode dan rincian pembayaran tidak cocok' }, { status: 400 });
             paymentBreakdown = JSON.stringify({ qris, tunai: cash });
+            qrisPortion = qris;
+            cashPortion = cash;
         }
 
-        const inserted = await addTransactionIdempotent({
+        const transaction = {
             id,
             tanggal,
             waktu: waktu || new Date().toLocaleTimeString('id-ID'),
@@ -84,7 +90,41 @@ export async function POST(request: Request) {
             rincian_bayar: paymentBreakdown,
             kasir,
             nama_pelanggan: nama_pelanggan || '',
-        });
+        };
+        let inserted;
+        if (body.bca_verification !== undefined) {
+            if (qrisPortion <= 0 || !['qris', 'campuran'].includes(metode_bayar)) {
+                throw new BcaError('INVALID_VERIFICATION', 'Referensi BCA harus disertai rincian QRIS.', 400);
+            }
+            if (!Number.isSafeInteger(Number(bayar)) || Number(bayar) < Number(total) || Number(kembalian ?? 0) !== Number(bayar) - Number(total)) {
+                throw new BcaError('INVALID_PAYMENT', 'Nominal pembayaran atau kembalian tidak valid.', 400);
+            }
+            const ownerId = await authenticatedBcaUser(request.headers.get('cookie'));
+            const dbTransaction = await getDb().transaction('write');
+            try {
+                const reference = await claimForSale(dbTransaction, {
+                    verification: body.bca_verification, amount: qrisPortion, transactionId: String(id), ownerId,
+                });
+                const existing = await dbTransaction.execute({ sql: 'SELECT rincian_bayar FROM transactions WHERE id = ?', args: [String(id)] });
+                if (existing.rows.length) {
+                    const previous = JSON.parse(String(existing.rows[0].rincian_bayar || '{}'));
+                    if (previous.bca?.checkoutId !== reference.checkoutId || previous.qris !== qrisPortion || previous.tunai !== cashPortion) {
+                        throw new BcaError('TRANSACTION_CONFLICT', 'ID transaksi sudah digunakan untuk pembayaran berbeda.', 409);
+                    }
+                }
+                transaction.rincian_bayar = JSON.stringify({ qris: qrisPortion, tunai: cashPortion, bca: reference });
+                inserted = await addTransactionIdempotent(transaction, dbTransaction);
+                await dbTransaction.execute({ sql: 'UPDATE bca_qris_claims SET transaction_id = ? WHERE checkout_id = ?', args: [String(id), reference.checkoutId] });
+                await dbTransaction.commit();
+            } catch (error) {
+                await dbTransaction.rollback();
+                throw error;
+            } finally {
+                dbTransaction.close();
+            }
+        } else {
+            inserted = await addTransactionIdempotent(transaction);
+        }
 
         return NextResponse.json({
             success: true,
@@ -92,6 +132,10 @@ export async function POST(request: Request) {
             message: inserted ? 'Transaksi berhasil disimpan' : 'Transaksi sudah tersimpan sebelumnya',
         });
     } catch (error) {
+        if (error instanceof BcaError) {
+            const result = errorResponse(error);
+            return NextResponse.json(result.body, { status: result.status });
+        }
         console.error('Error saving transaction:', error);
         return NextResponse.json({ success: false, error: 'Gagal menyimpan transaksi' }, { status: 500 });
     }

@@ -7,6 +7,8 @@ import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 import QrisPaymentPanel from '@/components/QrisPaymentPanel';
+import BcaMutasiPanel from '@/components/BcaMutasiPanel';
+import type { QrisPaymentIntent, BcaVerification } from '@/lib/bca-payment';
 import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
 import { ArrowLeft, Banknote, Check, QrCode } from 'lucide-react';
 
@@ -21,6 +23,7 @@ export default function KasirPage() {
     const [qrisAmount, setQrisAmount] = useState(0);
     const [qrisCashReceived, setQrisCashReceived] = useState<number | null>(null);
     const [qrisReady, setQrisReady] = useState(false);
+    const [qrisIntent, setQrisIntent] = useState<QrisPaymentIntent | null>(null);
     const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
     const checkoutLock = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
@@ -403,6 +406,8 @@ export default function KasirPage() {
         setQrisAmount(0);
         setQrisCashReceived(null);
         setQrisReady(false);
+        setQrisIntent(null);
+        try { sessionStorage.removeItem('kasir-qris-intent'); } catch { /* Storage can be disabled. */ }
         setMetodeBayar('tunai');
         setLoadedDraftId(null);
         setNamaPelanggan('');
@@ -469,9 +474,38 @@ export default function KasirPage() {
     const total = Math.max(0, subtotal - diskonTotal);
     const activeQrisAmount = Math.min(qrisAmount, total);
     const qrisRemaining = Math.max(0, total - activeQrisAmount);
-    const qrisCashAmount = qrisRemaining > 0 ? (qrisCashReceived ?? qrisRemaining) : 0;
+    const qrisCashAmount = qrisRemaining > 0 ? (qrisCashReceived ?? 0) : 0;
     const bayarAktif = metodeBayar === 'qris' ? activeQrisAmount + qrisCashAmount : getCashReceived(total, bayar);
     const kembalianAktif = bayarAktif - total;
+
+    const paymentFingerprint = JSON.stringify({ cart, total, amount: activeQrisAmount,
+        qris: settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD });
+    const activeQrisIntent = qrisIntent?.fingerprint === paymentFingerprint ? qrisIntent : null;
+    useEffect(() => {
+        if (step !== 'payment' || metodeBayar !== 'qris' || activeQrisAmount < 1) return;
+        let stored: QrisPaymentIntent | null = null;
+        try {
+            const parsed = JSON.parse(sessionStorage.getItem('kasir-qris-intent') || 'null');
+            if (parsed?.fingerprint === paymentFingerprint && typeof parsed.checkoutId === 'string' &&
+                Number.isFinite(Date.parse(parsed.timestamp)) && Date.now() - Date.parse(parsed.timestamp) < 6 * 86400000) stored = parsed;
+        } catch { /* Use a new intent if local storage is unavailable. */ }
+        setQrisIntent(current => current?.fingerprint === paymentFingerprint ? current : stored || {
+            fingerprint: paymentFingerprint, checkoutId: crypto.randomUUID(),
+            amount: activeQrisAmount, timestamp: new Date().toISOString(),
+        });
+    }, [step, metodeBayar, activeQrisAmount, paymentFingerprint]);
+
+    useEffect(() => {
+        if (qrisIntent) {
+            try { sessionStorage.setItem('kasir-qris-intent', JSON.stringify(qrisIntent)); } catch { /* Optional recovery storage. */ }
+        }
+    }, [qrisIntent]);
+
+    const handleBcaVerified = useCallback((verification: BcaVerification) => {
+        setQrisIntent(current => current?.checkoutId === verification.checkoutId &&
+            current.amount === verification.amount && current.timestamp === verification.timestamp
+            ? { ...current, verification } : current);
+    }, []);
 
     function showToast(message: string, type: string = 'success') {
         setToast({ message, type });
@@ -632,7 +666,7 @@ export default function KasirPage() {
         }
         const remainingCash = method === 'qris' ? total - activeQrisAmount : 0;
         const cashReceived = method === 'qris'
-            ? (remainingCash > 0 ? (qrisCashReceived ?? remainingCash) : 0)
+            ? (remainingCash > 0 ? (qrisCashReceived ?? 0) : 0)
             : getCashReceived(total, forcedBayar ?? bayar);
         const finalBayar = method === 'qris' ? activeQrisAmount + cashReceived : cashReceived;
         const finalKembalian = finalBayar - total;
@@ -640,11 +674,15 @@ export default function KasirPage() {
             showToast('Jumlah bayar kurang!', 'error');
             return;
         }
+        if (method === 'qris' && activeQrisIntent?.verification && !isOnline) {
+            showToast('Hubungkan internet untuk menyimpan pembayaran yang terverifikasi BCA.', 'error');
+            return;
+        }
 
         checkoutLock.current = true;
         setIsCheckoutSubmitting(true);
 
-        const transactionId = generateTransactionId();
+        const transactionId = method === 'qris' && activeQrisIntent ? activeQrisIntent.checkoutId : generateTransactionId();
         const tanggal = getTodayDate();
         const waktu = getCurrentTime();
         const finalMethod: PaymentMethod | 'campuran' = method === 'qris'
@@ -667,6 +705,7 @@ export default function KasirPage() {
                 : { tunai: total }),
             kasir: 'Admin',
             nama_pelanggan: namaPelanggan.trim(),
+            ...(method === 'qris' && activeQrisIntent?.verification ? { bca_verification: activeQrisIntent.verification } : {}),
         };
 
         try {
@@ -1221,7 +1260,7 @@ export default function KasirPage() {
                     <div className={`pos-cart checkout-card ${metodeBayar === 'qris' ? 'checkout-card--qris' : ''}`}>
                         <div className="checkout-header">
                             <div className="checkout-heading">
-                                <button className="checkout-back" aria-label="Kembali ke pesanan" onClick={() => setStep(isTablet ? 'selection' : 'review')}>
+                                <button className="checkout-back" aria-label="Kembali ke pesanan" disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification} onClick={() => setStep(isTablet ? 'selection' : 'review')}>
                                     <ArrowLeft size={20} aria-hidden="true" />
                                 </button>
                                 <div><span className="checkout-eyebrow">Selesaikan pesanan</span><h2>Pembayaran</h2></div>
@@ -1236,6 +1275,7 @@ export default function KasirPage() {
                                     <button
                                         type="button"
                                         aria-pressed={metodeBayar === 'tunai'}
+                                        disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
                                         className={`payment-method ${metodeBayar === 'tunai' ? 'active' : ''}`}
                                         onClick={() => setMetodeBayar('tunai')}
                                     >
@@ -1245,6 +1285,7 @@ export default function KasirPage() {
                                     <button
                                         type="button"
                                         aria-pressed={metodeBayar === 'qris'}
+                                        disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
                                         className={`payment-method ${metodeBayar === 'qris' ? 'active' : ''}`}
                                         onClick={() => {
                                             if (metodeBayar !== 'qris' || activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
@@ -1303,6 +1344,7 @@ export default function KasirPage() {
                                             <span className="checkout-currency">Rp</span>
                                             <input
                                                 id="qris-amount"
+                                                disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
                                                 type="number"
                                                 min={1}
                                                 max={Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)}
@@ -1317,7 +1359,7 @@ export default function KasirPage() {
                                                 inputMode="numeric"
                                                 aria-describedby="qris-amount-hint"
                                             />
-                                            <button className="btn btn-sm btn-secondary" type="button" onClick={() => {
+                                            <button className="btn btn-sm btn-secondary" type="button" disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification} onClick={() => {
                                                 if (activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
                                                 setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
                                                 setQrisCashReceived(null);
@@ -1335,7 +1377,8 @@ export default function KasirPage() {
                                                     id="qris-cash-received"
                                                     type="number"
                                                     min={qrisRemaining}
-                                                    value={qrisCashReceived ?? qrisRemaining}
+                                                    value={qrisCashReceived ?? ''}
+                                                    placeholder={String(qrisRemaining)}
                                                     onChange={(event) => setQrisCashReceived(event.target.value === '' ? null : (Number.parseInt(event.target.value, 10) || 0))}
                                                     inputMode="numeric"
                                                 />
@@ -1386,6 +1429,14 @@ export default function KasirPage() {
                                 amount={activeQrisAmount}
                                 onReady={setQrisReady}
                             />}
+                            {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
+                                key={activeQrisIntent.checkoutId}
+                                intent={activeQrisIntent}
+                                ready={qrisReady}
+                                remainingCash={qrisRemaining}
+                                cashReceived={qrisCashAmount}
+                                onVerified={handleBcaVerified}
+                            />}
                         </div>
                         <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
                             <button
@@ -1395,7 +1446,8 @@ export default function KasirPage() {
                                 aria-busy={isCheckoutSubmitting}
                             >
                                 <Check size={18} aria-hidden="true" />
-                                {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'Konfirmasi Pembayaran & Simpan' : 'Bayar & Simpan')}
+                                {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris'
+                                    ? (activeQrisIntent?.verification ? 'Simpan Pembayaran' : 'Konfirmasi Manual & Simpan') : 'Bayar & Simpan')}
                             </button>
                             <button className="btn btn-secondary" onClick={handleSaveDraft}>
                                 💾 Simpan Draft

@@ -4393,6 +4393,28 @@ dialog[open].lp-modal-dialog {
 .qris-cash-remainder label { color: var(--text-secondary); font-size: 13px; }
 .qris-cash-remainder input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 
+.bca-mutasi-panel { grid-column: 1 / -1; min-width: 0; padding: 18px; border: 1px solid var(--border-soft); border-radius: 16px; background: var(--bg-raised); }
+.bca-mutasi-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bca-mutasi-heading strong { color: var(--text-700); font-size: 14px; }
+.bca-mutasi-heading .btn { display: inline-flex; align-items: center; gap: 6px; }
+.bca-mutasi-table-wrap { max-height: 230px; overflow: auto; border: 1px solid var(--border-soft); border-radius: 10px; margin-bottom: 14px; }
+.bca-mutasi-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.bca-mutasi-table th { position: sticky; top: 0; background: var(--bg-surface); color: var(--text-500); font-size: 11px; font-weight: 600; }
+.bca-mutasi-table th, .bca-mutasi-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-soft); }
+.bca-mutasi-table th:last-child, .bca-mutasi-table td:last-child { text-align: right; white-space: nowrap; }
+.bca-mutasi-table tbody tr:last-child td { border-bottom: 0; }
+.bca-mutasi-empty { color: var(--text-500); font-size: 11px; padding: 16px 12px; }
+.bca-check-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; }
+.bca-mutasi-message { margin-top: 9px; color: var(--text-500); font-size: 12px; line-height: 1.6; }
+.bca-mutasi-panel > small { display: block; margin-top: 4px; color: var(--text-500); font-size: 10px; }
+.bca-mutasi-candidates { display: grid; gap: 8px; margin-bottom: 14px; }
+.bca-mutasi-candidates p { color: var(--text-700); font-size: 12px; }
+.bca-mutasi-candidates .btn { min-height: 42px; white-space: normal; overflow-wrap: anywhere; }
+.bca-payment-confirmed { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px; color: var(--success); border: 1px solid var(--border-soft); border-radius: 10px; font-size: 12px; font-weight: 600; }
+.bca-loading-icon { animation: bca-spin 1s linear infinite; }
+@keyframes bca-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bca-loading-icon { animation: none; } }
+
 @container (min-width: 620px) {
   .checkout-card--qris .checkout-body { grid-template-columns: minmax(0, 1fr) minmax(260px, 0.95fr); gap: 30px; }
   .checkout-card--qris .checkout-footer { flex-direction: row; justify-content: space-between; align-items: center; }
