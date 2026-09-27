@@ -25,7 +25,7 @@ export async function GET() {
         const db = getDb();
 
         const transactionsRes = await db.execute(`
-            SELECT id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan, created_at 
+            SELECT id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, rincian_bayar, kasir, nama_pelanggan, created_at
             FROM transactions 
             ORDER BY created_at DESC 
             LIMIT 50

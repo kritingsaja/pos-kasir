@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
         const date = dateParam(request.nextUrl.searchParams.get('date'), jakartaDate());
         const db = getDb();
         const results = await Promise.all([
-            db.execute({ sql: 'SELECT id,tanggal,waktu,total,metode_bayar,nama_pelanggan,items FROM transactions WHERE tanggal = ? ORDER BY waktu DESC,id DESC', args: [date] }),
+            db.execute({ sql: 'SELECT id,tanggal,waktu,total,metode_bayar,rincian_bayar,nama_pelanggan,items FROM transactions WHERE tanggal = ? ORDER BY waktu DESC,id DESC', args: [date] }),
             db.execute('SELECT COUNT(*) AS count FROM products WHERE aktif = 1'),
             db.execute('SELECT COUNT(*) AS count FROM drafts'),
             db.execute({ sql: 'SELECT tanggal,SUM(total) AS total FROM transactions WHERE tanggal LIKE ? GROUP BY tanggal ORDER BY tanggal', args: [`${date.slice(0, 7)}-%`] }),

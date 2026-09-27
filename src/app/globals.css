@@ -4327,6 +4327,21 @@ dialog[open].lp-modal-dialog {
   font-size: 18px;
 }
 
+.qris-panel { margin-top: 16px; }
+.qris-panel .input-group { margin-bottom: 12px; }
+.qris-panel .input-group small, .qris-cash-remainder small { display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }
+.qris-remainder { display: flex; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 8px; background: var(--brand-dim); color: var(--text-primary); }
+.qris-remainder strong { color: var(--brand); }
+.qris-image-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: white; text-align: center; }
+.qris-image-wrap img { width: min(280px, 100%); height: auto; image-rendering: pixelated; }
+.qris-image-wrap strong { color: #202820; font-size: 20px; }
+.qris-image-wrap small { max-width: 280px; color: #58645c; font-size: 11px; }
+.qris-error { padding: 10px 12px; border-radius: 8px; background: rgba(196, 64, 64, 0.1); color: var(--danger); font-size: 13px; }
+.qris-loading { color: var(--text-muted); font-size: 13px; text-align: center; }
+.qris-cash-remainder { display: grid; gap: 6px; margin-top: 12px; }
+.qris-cash-remainder label { color: var(--text-secondary); font-size: 13px; }
+.qris-cash-remainder input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+
 .product-card.unavailable {
   opacity: 0.58;
   filter: grayscale(0.55);

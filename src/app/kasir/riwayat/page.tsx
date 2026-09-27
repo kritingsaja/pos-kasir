@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Receipt from '@/components/Receipt';
+import { getPaymentMethodLabel } from '@/lib/cash-payment';
 import Link from 'next/link';
 
 export default function KasirRiwayat() {
@@ -16,6 +17,7 @@ export default function KasirRiwayat() {
         bayar: number;
         kembalian: number;
         metode_bayar: string;
+        rincian_bayar?: string;
         kasir?: string;
         nama_pelanggan?: string;
         created_at: string;
@@ -137,8 +139,8 @@ export default function KasirRiwayat() {
                                                 <td>#{trx.id}</td>
                                                 <td>{trx.nama_pelanggan || '-'}</td>
                                                 <td>
-                                                    <span className={`badge badge-${trx.metode_bayar === 'Tunai' ? 'success' : 'info'}`}>
-                                                        {trx.metode_bayar}
+                                                    <span className={`badge badge-${trx.metode_bayar === 'tunai' || trx.metode_bayar === 'Tunai' ? 'success' : 'info'}`}>
+                                                        {getPaymentMethodLabel(trx.metode_bayar)}
                                                     </span>
                                                 </td>
                                                 <td style={{ fontWeight: '600' }}>{formatRupiah(trx.subtotal)}</td>
@@ -182,8 +184,8 @@ export default function KasirRiwayat() {
                                     </div>
                                     <div className="card-body">
                                         <div className="trx-info">
-                                            <span className={`badge badge-${trx.metode_bayar === 'Tunai' ? 'success' : 'info'}`}>
-                                                {trx.metode_bayar}
+                                            <span className={`badge badge-${trx.metode_bayar === 'tunai' || trx.metode_bayar === 'Tunai' ? 'success' : 'info'}`}>
+                                                {getPaymentMethodLabel(trx.metode_bayar)}
                                             </span>
                                             <div className="trx-total">{formatRupiah(trx.total)}</div>
                                         </div>
@@ -263,7 +265,7 @@ export default function KasirRiwayat() {
                                     total={selectedTransaction.total}
                                     bayar={selectedTransaction.bayar}
                                     kembalian={selectedTransaction.kembalian}
-                                    metodeBayar={selectedTransaction.metode_bayar || "Tunai"}
+                                    metodeBayar={getPaymentMethodLabel(selectedTransaction.metode_bayar)}
                                     nama_pelanggan={selectedTransaction.nama_pelanggan}
                                     namaToko={settings.nama_toko}
                                     alamatToko={settings.alamat_toko}

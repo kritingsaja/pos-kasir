@@ -36,22 +36,30 @@ export async function appendTransactionsToSheet(spreadsheetId: string, transacti
         t.diskon_total,
         t.total,
         t.metode_bayar,
-        t.kasir || 'Admin'
+        t.kasir || 'Admin',
+        t.rincian_bayar || ''
     ]);
 
     try {
-        const response = await sheets.spreadsheets.values.get({
+        const headerResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Sheet1!A1:H1',
+            range: 'Sheet1!A1:I1',
         });
-        if (!response.data.values || response.data.values.length === 0) {
+        if (!headerResponse.data.values || headerResponse.data.values.length === 0) {
             await sheets.spreadsheets.values.append({
                 spreadsheetId,
                 range: 'Sheet1!A1',
                 valueInputOption: 'RAW',
                 requestBody: {
-                    values: [['No. Transaksi', 'Tanggal', 'Waktu', 'Subtotal', 'Diskon', 'Total', 'Metode', 'Kasir']],
+                    values: [['No. Transaksi', 'Tanggal', 'Waktu', 'Subtotal', 'Diskon', 'Total', 'Metode', 'Kasir', 'Rincian Pembayaran']],
                 },
+            });
+        } else if (!headerResponse.data.values[0]?.[8]) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: 'Sheet1!I1',
+                valueInputOption: 'RAW',
+                requestBody: { values: [['Rincian Pembayaran']] },
             });
         }
     } catch (error: any) {

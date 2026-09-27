@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, formatRupiah, formatDate, CartItem } from '@/lib/utils';
+import { formatPaymentBreakdown, getPaymentMethodLabel } from '@/lib/cash-payment';
 
 /* ── Month names in Indonesian ── */
 const BULAN_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -171,6 +172,8 @@ export default function LaporanPage() {
                     const items = parseItems(t.items);
                     const isExp = expandedTrx === t.id;
                     const isTunai = t.metode_bayar === 'tunai';
+                    const paymentLabel = getPaymentMethodLabel(t.metode_bayar);
+                    const paymentDetail = formatPaymentBreakdown(t.rincian_bayar);
                     return (
                         <div key={t.id} className={`lp-trx-card ${isExp ? 'expanded' : ''}`}>
                             <div
@@ -189,7 +192,7 @@ export default function LaporanPage() {
                                             <span>{items.length} item</span>
                                             <span className="lp-dot">·</span>
                                             <span className={`lp-method-badge ${isTunai ? 'tunai' : 'transfer'}`}>
-                                                {isTunai ? '💵' : '💳'} {t.metode_bayar}
+                                                {isTunai ? '💵' : '💳'} {paymentLabel}
                                             </span>
                                         </div>
                                     </div>
@@ -201,6 +204,7 @@ export default function LaporanPage() {
                             </div>
                             {isExp && (
                                 <div className="lp-trx-detail">
+                                    {paymentDetail && <div className="lp-trx-detail-label">Pembayaran: {paymentDetail}</div>}
                                     <div className="lp-trx-detail-label">Rincian Item</div>
                                     {items.map((item: any, i: number) => (
                                         <div key={i} className="lp-trx-item-row">

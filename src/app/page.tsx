@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, Banknote, KeyRound, Package, QrCode, ReceiptText, RefreshCw, Wallet } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatRupiah } from '@/lib/utils';
+import { getPaymentMethodLabel } from '@/lib/cash-payment';
 import './admin.css';
 
 interface Overview {
@@ -76,7 +77,7 @@ export default function DashboardPage() {
       </div>
       <section className="admin-section"><div className="admin-section-heading"><h2>Transaksi terbaru</h2><Link href="/laporan" className="admin-text-link">Laporan <ArrowUpRight size={15} /></Link></div>
         <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Transaksi</th><th>Waktu</th><th>Pelanggan</th><th>Pembayaran</th><th className="admin-number">Total</th></tr></thead><tbody>
-          {ready && data.recent.map(t => <tr key={t.id}><td className="admin-code">{t.id}</td><td>{t.waktu}</td><td>{t.nama_pelanggan || '-'}</td><td><span className={`admin-status ${t.metode_bayar?.toLowerCase() === 'qris' ? 'pink' : ''}`}>{t.metode_bayar?.toLowerCase() === 'qris' ? 'QRIS' : ['tunai','cash'].includes(t.metode_bayar?.toLowerCase()) || !t.metode_bayar ? 'Cash' : t.metode_bayar}</span></td><td className="admin-number">{formatRupiah(Number(t.total))}</td></tr>)}
+          {ready && data.recent.map(t => <tr key={t.id}><td className="admin-code">{t.id}</td><td>{t.waktu}</td><td>{t.nama_pelanggan || '-'}</td><td><span className={`admin-status ${['qris','campuran'].includes(t.metode_bayar?.toLowerCase()) ? 'pink' : ''}`}>{getPaymentMethodLabel(t.metode_bayar)}</span></td><td className="admin-number">{formatRupiah(Number(t.total))}</td></tr>)}
           {(!ready || !data.recent.length) && <tr><td colSpan={5} className="admin-empty">{loading ? 'Memuat...' : error ? 'Data tidak tersedia' : 'Belum ada transaksi pada tanggal ini'}</td></tr>}
         </tbody></table></div>
       </section>

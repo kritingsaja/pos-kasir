@@ -81,6 +81,7 @@ export interface Transaction {
     bayar: number;
     kembalian: number;
     metode_bayar: string;
+    rincian_bayar?: string;
     kasir: string;
     nama_pelanggan?: string;
     created_at: string;

@@ -62,6 +62,7 @@ export async function initializeDatabase() {
         bayar INTEGER NOT NULL DEFAULT 0,
         kembalian INTEGER NOT NULL DEFAULT 0,
         metode_bayar TEXT NOT NULL DEFAULT 'tunai',
+        rincian_bayar TEXT NOT NULL DEFAULT '',
         kasir TEXT DEFAULT 'Admin',
         nama_pelanggan TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime'))
@@ -118,6 +119,10 @@ export async function initializeDatabase() {
     ];
 
     await db.batch(schema.map(sql => ({ sql, args: [] })));
+    const transactionColumns = await db.execute('PRAGMA table_info(transactions)');
+    if (!transactionColumns.rows.some((column) => String((column as Record<string, unknown>).name) === 'rincian_bayar')) {
+      await db.execute("ALTER TABLE transactions ADD COLUMN rincian_bayar TEXT NOT NULL DEFAULT ''");
+    }
     console.log("Tables OK.");
 
     // 2. Default Settings
@@ -127,6 +132,7 @@ export async function initializeDatabase() {
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['telepon_toko', '08123456789'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['auto_print_bluetooth', 'true'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['qris_static_payload', '00020101021126650013ID.CO.BCA.WWW011893600014000101195202150008850010119520303UMI51440014ID.CO.QRIS.WWW0215ID10200471870560303UMI5204581453033605802ID5911T3A.CO CAFE6006KENDAL61055137262070703A0163045194'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_date', ''] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_codes', '[]'] }
     ]);
@@ -301,6 +307,7 @@ interface TransactionInput {
   bayar: number;
   kembalian: number;
   metode_bayar: string;
+  rincian_bayar?: string;
   kasir?: string;
   nama_pelanggan?: string;
 }
@@ -308,11 +315,11 @@ interface TransactionInput {
 export async function addTransaction(t: TransactionInput) {
   const db = getDb();
   return await db.execute({
-    sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, rincian_bayar, kasir, nama_pelanggan)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       t.id, t.tanggal, t.waktu, t.items, t.subtotal, t.diskon_total, 
-      t.total, t.bayar, t.kembalian, t.metode_bayar, 
+      t.total, t.bayar, t.kembalian, t.metode_bayar, t.rincian_bayar || '',
       t.kasir || 'Admin', t.nama_pelanggan || ''
     ]
   });
@@ -321,12 +328,12 @@ export async function addTransaction(t: TransactionInput) {
 export async function addTransactionIdempotent(t: TransactionInput): Promise<boolean> {
   const db = getDb();
   const result = await db.execute({
-    sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, kasir, nama_pelanggan)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    sql: `INSERT INTO transactions (id, tanggal, waktu, items, subtotal, diskon_total, total, bayar, kembalian, metode_bayar, rincian_bayar, kasir, nama_pelanggan)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO NOTHING`,
     args: [
       t.id, t.tanggal, t.waktu, t.items, t.subtotal, t.diskon_total,
-      t.total, t.bayar, t.kembalian, t.metode_bayar,
+      t.total, t.bayar, t.kembalian, t.metode_bayar, t.rincian_bayar || '',
       t.kasir || 'Admin', t.nama_pelanggan || ''
     ]
   });

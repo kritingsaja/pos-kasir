@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_code TEXT UNIQUE NOT NULL,
     total_amount DECIMAL(10,2) NOT NULL,
     payment_method TEXT,
+    rincian_bayar TEXT NOT NULL DEFAULT '',
     customer_name TEXT,
     items JSON, -- Store as JSON string
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

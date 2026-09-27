@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { DEFAULT_QRIS_STATIC_PAYLOAD } from '@/lib/qris';
 
 export default function PengaturanPage() {
     const [settings, setSettings] = useState({
@@ -14,6 +15,7 @@ export default function PengaturanPage() {
         telegram_bot_token: '',
         telegram_chat_id: '',
         auto_print_bluetooth: 'true',
+        qris_static_payload: DEFAULT_QRIS_STATIC_PAYLOAD,
     });
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
@@ -54,7 +56,7 @@ export default function PengaturanPage() {
             if (data.success) {
                 showToast('Pengaturan berhasil disimpan');
             } else {
-                showToast('Gagal menyimpan', 'error');
+                showToast(data.error || 'Gagal menyimpan', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -131,6 +133,37 @@ export default function PengaturanPage() {
                                     ID bisa ditemukan di URL spreadsheet Anda.
                                 </small>
                             </div>
+                        </div>
+                    </form>
+                </div>
+
+                {/* ── QRIS Dinamis ── */}
+                <div className="card" style={{ marginTop: '20px' }}>
+                    <div className="card-header">
+                        <h2>▦ QRIS Dinamis</h2>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                            QRIS statis ini akan dibuat ulang dengan nominal belanja saat kasir memilih QRIS.
+                        </p>
+                    </div>
+                    <form onSubmit={handleSave}>
+                        <div className="modal-body">
+                            <div className="input-group">
+                                <label>Data QRIS Statis Merchant</label>
+                                <textarea
+                                    rows={5}
+                                    value={settings.qris_static_payload}
+                                    onChange={(e) => setSettings({ ...settings, qris_static_payload: e.target.value })}
+                                    style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' }}
+                                />
+                                <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                                    Sudah diisi dari QRIS T3A.CO CAFE yang kamu kirim. Ganti hanya jika memakai QRIS merchant lain. Tidak perlu API key.
+                                </small>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="submit" className="btn btn-primary" disabled={saving}>
+                                {saving ? '⏳ Menyimpan...' : '💾 Simpan Data QRIS'}
+                            </button>
                         </div>
                     </form>
                 </div>

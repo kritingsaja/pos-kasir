@@ -6,6 +6,8 @@ import Receipt from '@/components/Receipt';
 import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
+import QrisPaymentPanel from '@/components/QrisPaymentPanel';
+import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
 
 export default function KasirPage() {
     type PaymentMethod = 'tunai' | 'qris';
@@ -15,6 +17,9 @@ export default function KasirPage() {
     const [step, setStep] = useState<'selection' | 'review' | 'payment' | 'receipt'>('selection');
     const [cart, setCart] = useState<CartItem[]>([]);
     const [bayar, setBayar] = useState<number | null>(null);
+    const [qrisAmount, setQrisAmount] = useState(0);
+    const [qrisCashReceived, setQrisCashReceived] = useState<number | null>(null);
+    const [qrisReady, setQrisReady] = useState(false);
     const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
     const checkoutLock = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
@@ -38,7 +43,7 @@ export default function KasirPage() {
         nama_pelanggan?: string;
         isDraft?: boolean;
         isKitchen?: boolean;
-        metode_bayar?: PaymentMethod;
+        metode_bayar?: PaymentMethod | 'campuran';
     } | null>(null);
     const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
     const [savedDrafts, setSavedDrafts] = useState<DraftRow[]>([]);
@@ -394,6 +399,9 @@ export default function KasirPage() {
     function clearCart() {
         setCart([]);
         setBayar(null);
+        setQrisAmount(0);
+        setQrisCashReceived(null);
+        setQrisReady(false);
         setMetodeBayar('tunai');
         setLoadedDraftId(null);
         setNamaPelanggan('');
@@ -458,8 +466,11 @@ export default function KasirPage() {
 
     const diskonTotal = itemDiskonTotal + globalDiskonAmount;
     const total = Math.max(0, subtotal - diskonTotal);
-    const bayarAktif = metodeBayar === 'qris' ? total : getCashReceived(total, bayar);
-    const kembalianAktif = metodeBayar === 'qris' ? 0 : bayarAktif - total;
+    const activeQrisAmount = Math.min(qrisAmount, total);
+    const qrisRemaining = Math.max(0, total - activeQrisAmount);
+    const qrisCashAmount = qrisRemaining > 0 ? (qrisCashReceived ?? qrisRemaining) : 0;
+    const bayarAktif = metodeBayar === 'qris' ? activeQrisAmount + qrisCashAmount : getCashReceived(total, bayar);
+    const kembalianAktif = bayarAktif - total;
 
     function showToast(message: string, type: string = 'success') {
         setToast({ message, type });
@@ -601,8 +612,29 @@ export default function KasirPage() {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
-        const finalBayar = method === 'qris' ? total : getCashReceived(total, forcedBayar ?? bayar);
-        const finalKembalian = method === 'qris' ? 0 : finalBayar - total;
+        const qrisPayload = settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD;
+        if (method === 'qris') {
+            if (!Number.isSafeInteger(activeQrisAmount) || activeQrisAmount < 1 || activeQrisAmount > Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) {
+                showToast('Nominal QRIS harus antara Rp1 dan batas Rp10.000.000 per transaksi.', 'error');
+                return;
+            }
+            if (!qrisReady) {
+                showToast('Tunggu sampai QRIS selesai dibuat sebelum mengonfirmasi pembayaran.', 'error');
+                return;
+            }
+            try {
+                convertStaticQrisToDynamic(qrisPayload, activeQrisAmount);
+            } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Data QRIS belum valid.', 'error');
+                return;
+            }
+        }
+        const remainingCash = method === 'qris' ? total - activeQrisAmount : 0;
+        const cashReceived = method === 'qris'
+            ? (remainingCash > 0 ? (qrisCashReceived ?? remainingCash) : 0)
+            : getCashReceived(total, forcedBayar ?? bayar);
+        const finalBayar = method === 'qris' ? activeQrisAmount + cashReceived : cashReceived;
+        const finalKembalian = finalBayar - total;
         if (finalBayar < total) {
             showToast('Jumlah bayar kurang!', 'error');
             return;
@@ -614,6 +646,9 @@ export default function KasirPage() {
         const transactionId = generateTransactionId();
         const tanggal = getTodayDate();
         const waktu = getCurrentTime();
+        const finalMethod: PaymentMethod | 'campuran' = method === 'qris'
+            ? (remainingCash > 0 ? 'campuran' : 'qris')
+            : 'tunai';
 
         const payload = {
             id: transactionId,
@@ -625,7 +660,10 @@ export default function KasirPage() {
             total,
             bayar: finalBayar,
             kembalian: finalKembalian,
-            metode_bayar: method,
+            metode_bayar: finalMethod,
+            rincian_bayar: JSON.stringify(method === 'qris'
+                ? { qris: activeQrisAmount, tunai: remainingCash }
+                : { tunai: total }),
             kasir: 'Admin',
             nama_pelanggan: namaPelanggan.trim(),
         };
@@ -1209,10 +1247,15 @@ export default function KasirPage() {
                                     <button
                                         type="button"
                                         className={`payment-method ${metodeBayar === 'qris' ? 'active' : ''}`}
-                                        onClick={() => setMetodeBayar('qris')}
+                                        onClick={() => {
+                                            setMetodeBayar('qris');
+                                            setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
+                                            setQrisCashReceived(null);
+                                            setQrisReady(false);
+                                        }}
                                     >
                                         <span>QRIS</span>
-                                        <small>Nominal pas</small>
+                                        <small>QR otomatis sesuai nominal</small>
                                     </button>
                                 </div>
 
@@ -1254,10 +1297,34 @@ export default function KasirPage() {
                                         </button>
                                     </div>
                                 </> : (
-                                    <div className="qris-payment-summary">
-                                        <span>Nominal QRIS</span>
-                                        <strong>{formatRupiah(total)}</strong>
-                                    </div>
+                                    <>
+                                        <QrisPaymentPanel
+                                            staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
+                                            amount={activeQrisAmount}
+                                            total={total}
+                                            remaining={qrisRemaining}
+                                            onReady={setQrisReady}
+                                            onAmountChange={(amount) => {
+                                                setQrisAmount(amount);
+                                                setQrisCashReceived(null);
+                                                setQrisReady(false);
+                                            }}
+                                        />
+                                        {qrisRemaining > 0 && (
+                                            <div className="qris-cash-remainder">
+                                                <label htmlFor="qris-cash-received">Tunai untuk sisa tagihan</label>
+                                                <input
+                                                    id="qris-cash-received"
+                                                    type="number"
+                                                    min={qrisRemaining}
+                                                    value={qrisCashReceived ?? qrisRemaining}
+                                                    onChange={(event) => setQrisCashReceived(event.target.value === '' ? null : (Number.parseInt(event.target.value, 10) || 0))}
+                                                    inputMode="numeric"
+                                                />
+                                                <small>Minimal {formatRupiah(qrisRemaining)}. Kelebihan tunai dihitung sebagai kembalian.</small>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
                                 <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Diskon Keseluruhan (Opsional)</p>
@@ -1287,9 +1354,9 @@ export default function KasirPage() {
 
                                 {bayarAktif > 0 && (
                                     <div className="kembalian-row" style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '8px' }}>
-                                        <span>{metodeBayar === 'qris' ? 'Pembayaran QRIS' : 'Kembalian'}</span>
+                                        <span>{metodeBayar === 'qris' ? (qrisRemaining > 0 ? 'QRIS + Tunai' : 'Pembayaran QRIS') : 'Kembalian'}</span>
                                         <span className="kembalian-value" style={{ color: kembalianAktif >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '20px' }}>
-                                            {metodeBayar === 'qris' ? 'Pas' : formatRupiah(Math.max(0, kembalianAktif))}
+                                            {metodeBayar === 'qris' && kembalianAktif === 0 ? 'Pas' : formatRupiah(Math.max(0, kembalianAktif))}
                                         </span>
                                     </div>
                                 )}
@@ -1302,7 +1369,7 @@ export default function KasirPage() {
                                         disabled={isCheckoutSubmitting}
                                         aria-busy={isCheckoutSubmitting}
                                     >
-                                        {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'QRIS Dibayar & Simpan' : 'Bayar & Simpan')}
+                                        {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'Sudah Cek Pembayaran QRIS & Simpan' : 'Bayar & Simpan')}
                                     </button>
                                     <button
                                         className="btn btn-secondary"
@@ -1568,7 +1635,7 @@ export default function KasirPage() {
                                         total={lastTransaction.total}
                                         bayar={lastTransaction.bayar}
                                         kembalian={lastTransaction.kembalian}
-                                        metodeBayar={lastTransaction.metode_bayar === 'qris' ? 'QRIS' : 'Tunai'}
+                                        metodeBayar={lastTransaction.metode_bayar === 'qris' ? 'QRIS' : lastTransaction.metode_bayar === 'campuran' ? 'QRIS + Tunai' : 'Tunai'}
                                         nama_pelanggan={lastTransaction.nama_pelanggan}
                                         namaToko={settings.nama_toko}
                                         alamatToko={settings.alamat_toko}
