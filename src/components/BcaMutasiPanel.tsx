@@ -16,6 +16,9 @@ interface CheckResult {
     checkedAt?: string;
     message?: string;
     error?: string;
+    code?: string;
+    stage?: string;
+    requestId?: string;
 }
 
 interface ConfigurationResult {
@@ -63,6 +66,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     const [rows, setRows] = useState<BankRow[]>([]);
     const [candidates, setCandidates] = useState<BankRow[]>([]);
     const [message, setMessage] = useState('');
+    const [diagnostic, setDiagnostic] = useState('');
     const [checkedAt, setCheckedAt] = useState('');
     const pending = useRef<AbortController | null>(null);
     const mounted = useRef(false);
@@ -103,6 +107,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         setBusy(true);
         onBusyChange(true);
         setMessage('');
+        setDiagnostic('');
         try {
             setPhase('Memeriksa koneksi…');
             const configuration = await readConfiguration(controller);
@@ -123,7 +128,10 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             const result = await readResponse<CheckResult>(response);
             if (!mounted.current) return;
             if (controller.signal.aborted) throw new Error('Portal BCA belum merespons dalam batas waktu. Coba lagi.');
-            if (!response.ok || !result.success) throw new Error(result.error || 'Pengecekan BCA gagal.');
+            if (!response.ok || !result.success) {
+                setDiagnostic([result.code, result.stage, result.requestId].filter(Boolean).join(' · '));
+                throw new Error(result.error || 'Pengecekan BCA gagal.');
+            }
             setCheckedAt(result.checkedAt ?? '');
             if (mode === 'list') {
                 const list = Array.isArray(result.data) ? result.data : [];
@@ -186,6 +194,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             <p className="bca-mutasi-message" role="status" aria-live="polite">
                 {busy ? phase : message || (configured !== true ? configurationMessage : '')}
             </p>
+            {diagnostic && <details><summary>Detail error</summary><small style={{ overflowWrap: 'anywhere' }}>{diagnostic}</small></details>}
             {checkedAt && <small>Diperbarui {new Date(checkedAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</small>}
         </section>
     );

@@ -21,6 +21,8 @@ Untuk diagnosis, buka `/api/cek-mutasi-bca` pada preview yang sudah login POS. R
 
 Log endpoint menggunakan event `bca.configuration`, `bca.check.start`, `bca.check.progress`, `bca.check.finish` dan `bca.check.error`. Tahap scraper dicatat tanpa password, cookie bank, RRN, nama pelanggan atau body transaksi. Kesalahan dapat ditelusuri dengan requestId dan kode error.
 
+Saat POST gagal, respons juga berisi `code`, `stage`, dan `requestId`. PWA menampilkannya pada **Detail error**. Kirim pesan dan detail tersebut untuk diagnosis, tanpa mengirim kredensial. Kegagalan memuat dependensi, menjalankan Chromium, membuka halaman/form login, mengirim login, membaca profil dan membaca mutasi mempunyai pesan berbeda. `BCA_LOGIN_FAILED` hanya menyatakan proses login belum berhasil, bukan bukti password salah atau portal memblokir server. Kegagalan sebelum `logging_in` berarti login belum dicoba.
+
 ## Pencocokan dan penyimpanan
 
 - Timestamp dibuat ketika checkout QRIS dibuka, dipertahankan untuk retry, dan diperbarui bila keranjang/nominal/merchant berubah.

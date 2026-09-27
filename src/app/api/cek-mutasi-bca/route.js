@@ -22,6 +22,7 @@ export async function GET() {
 export async function POST(request) {
   const requestId = randomUUID();
   const start = Date.now();
+  let stage = 'validating_request';
   try {
     if (!request.headers.get('content-type')?.startsWith('application/json')) {
       throw new BcaError('INVALID_BODY', 'Gunakan Content-Type application/json.', 415);
@@ -32,14 +33,17 @@ export async function POST(request) {
     try { input = JSON.parse(text); } catch { throw new BcaError('INVALID_BODY', 'JSON tidak valid.', 400); }
     console.info(JSON.stringify({ event: 'bca.check.start', requestId, mode: input?.mode === 'list' ? 'list' : 'match' }));
     const body = await checkMutasiBca({ input, cookie: request.headers.get('cookie'), fetchSite: request.headers.get('sec-fetch-site'),
-      onProgress: stage => console.info(JSON.stringify({ event: 'bca.check.progress', requestId, stage, durationMs: Date.now() - start })),
+      onProgress: next => {
+        stage = next;
+        console.info(JSON.stringify({ event: 'bca.check.progress', requestId, stage, durationMs: Date.now() - start }));
+      },
     });
     console.info(JSON.stringify({ event: 'bca.check.finish', requestId, matched: body.matched ?? null, durationMs: Date.now() - start }));
     return Response.json(body, { headers: noCacheHeaders });
   } catch (error) {
     const result = errorResponse(error);
-    console.error(JSON.stringify({ event: 'bca.check.error', requestId, code: result.body.code, status: result.status, durationMs: Date.now() - start }));
-    return Response.json(result.body, {
+    console.error(JSON.stringify({ event: 'bca.check.error', requestId, stage, code: result.body.code, status: result.status, durationMs: Date.now() - start }));
+    return Response.json({ ...result.body, stage, requestId }, {
       status: result.status,
       headers: { ...noCacheHeaders, ...(result.status === 429 ? { 'Retry-After': '5' } : {}) },
     });

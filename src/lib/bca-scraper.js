@@ -5,16 +5,17 @@ const ORIGIN = 'https://qr.klikbca.com';
 export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), onProgress = () => {} }) {
   const { BCA_USER, BCA_PASS } = process.env;
   if (!BCA_USER || !BCA_PASS) throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
-  const [{ default: puppeteer }, { default: chromium }] = await Promise.all([
-    import('puppeteer-core'), import('@sparticuz/chromium'),
-  ]);
   let browser;
   let page;
   let authenticated = false;
   let deadline;
-  let stage = 'launching_browser';
+  let stage = 'loading_dependencies';
   function progress(next) { stage = next; onProgress(next); }
   try {
+    progress('loading_dependencies');
+    const [{ default: puppeteer }, { default: chromium }] = await Promise.all([
+      import('puppeteer-core'), import('@sparticuz/chromium'),
+    ]);
     progress('launching_browser');
     browser = await puppeteer.launch({
       args: puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
@@ -31,7 +32,9 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     // Placeholders observed on the public login screen. No CAPTCHA bypass or login retries.
     const email = 'input[placeholder="louis.briyant@mail.com"]';
     const password = 'input[placeholder="Contoh: Bca12345"]';
+    progress('waiting_login_form');
     await page.waitForSelector(email, { visible: true });
+    await page.waitForSelector(password, { visible: true });
     progress('logging_in');
     await page.type(email, BCA_USER);
     await page.type(password, BCA_PASS);
@@ -60,6 +63,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     if (!merchant.mid || merchant.nmid !== expectedNmid) {
       throw new BcaError('WRONG_MERCHANT', 'Merchant pada akun BCA berbeda dari QRIS di Pengaturan.', 409);
     }
+    progress('opening_transactions');
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('button.button-blue h4');
     const rows = [];
@@ -105,7 +109,9 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       kind: error instanceof Error ? error.name : 'UnknownError',
     }));
     if (error instanceof BcaError) throw error;
-    throw new BcaError('BCA_UNAVAILABLE', 'Portal BCA tidak dapat dibaca saat ini. Coba lagi atau cek manual.');
+    const failure = STAGE_FAILURES[stage];
+    throw new BcaError(failure?.code ?? 'BCA_UNAVAILABLE',
+      failure?.message ?? 'Portal BCA tidak dapat dibaca saat ini. Coba lagi atau cek manual.');
   } finally {
     if (deadline) clearTimeout(deadline);
     if (authenticated && page && !page.isClosed()) {
@@ -122,6 +128,18 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     if (browser) await browser.close().catch(() => {});
   }
 }
+
+// Fixed messages only: never return raw browser errors, bank HTML or credential values.
+const STAGE_FAILURES = {
+  loading_dependencies: { code: 'BCA_BROWSER_DEPENDENCIES', message: 'Komponen browser pengecekan BCA gagal dimuat di server.' },
+  launching_browser: { code: 'BCA_BROWSER_START_FAILED', message: 'Browser pengecekan BCA gagal dijalankan di server. Login BCA belum dicoba.' },
+  opening_login: { code: 'BCA_LOGIN_PAGE_UNAVAILABLE', message: 'Server belum berhasil membuka halaman login BCA.' },
+  waiting_login_form: { code: 'BCA_LOGIN_FORM_UNAVAILABLE', message: 'Form login BCA belum dapat dibaca oleh server. Login BCA belum dicoba.' },
+  logging_in: { code: 'BCA_LOGIN_FAILED', message: 'Login BCA dari server belum berhasil. Periksa login manual dan apakah BCA meminta verifikasi tambahan.' },
+  reading_merchant: { code: 'BCA_PROFILE_UNAVAILABLE', message: 'Server belum dapat membaca profil merchant setelah proses login BCA.' },
+  opening_transactions: { code: 'BCA_TRANSACTION_PAGE_UNAVAILABLE', message: 'Halaman transaksi BCA belum dapat dibuka setelah membaca profil merchant.' },
+  reading_mutations: { code: 'BCA_MUTATIONS_UNAVAILABLE', message: 'Halaman BCA sudah terbuka, tetapi daftar mutasi belum dapat dibaca.' },
+};
 
 async function findByText(elements, text) {
   for (const element of elements) {
