@@ -18,7 +18,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     ]);
     progress('launching_browser');
     browser = await puppeteer.launch({
-      args: puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
+      args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
       executablePath: await chromium.executablePath(),
       headless: 'shell', defaultViewport: { width: 1280, height: 900 }, timeout: 25_000,
     });

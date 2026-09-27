@@ -44,6 +44,8 @@ Login backend dan Chromium Linux di Vercel masih memerlukan pemeriksaan pada pre
 
 Chromium 153.0.0 dipasangkan dengan Puppeteer Core 25.11.0. Chromium ini untuk Linux serverless dan tidak dijalankan langsung pada Windows. Next.js mengexternalisasi kedua paket dan menyertakan berkas bin pada tracing route. API dan PWA tidak menyimpan hasil di cache jaringan.
 
+Puppeteer 25.11 mengembalikan Promise dari `defaultArgs()`. Peluncuran browser harus memakai `await puppeteer.defaultArgs(...)` agar `launch.args` menerima array, bukan Promise. Kesalahan ini menggagalkan peluncuran sebelum halaman login BCA dibuka.
+
 ## Titik kembali
 
 Versi sebelum integrasi: `634687ccc1a0947a015759f15272243654303a56` di main. Selama PR belum digabung, produksi tetap menggunakan versi ini. Setelah digabung, rollback kode dengan revert commit integrasi dan redeploy. Jangan menghapus tabel claim saat rollback; catatan tersebut mencegah pembayaran yang sama digunakan lagi.
