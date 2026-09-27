@@ -121,7 +121,7 @@ async function acquireLock(db) {
   };
 }
 
-export async function checkMutasiBca({ input, cookie, fetchSite }) {
+export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = () => {} }) {
   // Browser-generated cross-site requests must not trigger merchant logins or claims.
   if (fetchSite && !['same-origin', 'none'].includes(fetchSite)) {
     throw new BcaError('FORBIDDEN', 'Permintaan harus berasal dari aplikasi kasir.', 403);
@@ -131,6 +131,7 @@ export async function checkMutasiBca({ input, cookie, fetchSite }) {
   const payment = listOnly ? null : validatePayment(input);
   if (payment) payment.checkoutId ??= randomUUID();
   const db = getDatabase();
+  onProgress('authenticating_pos');
   const ownerId = await authenticate(cookie, db);
   const setting = await db.execute({ sql: "SELECT value FROM settings WHERE key = 'qris_static_payload'", args: [] });
   const nmid = nmidFromQris(setting.rows[0]?.value);
@@ -139,10 +140,12 @@ export async function checkMutasiBca({ input, cookie, fetchSite }) {
     const existing = await readClaim(db, payment.checkoutId);
     if (existing) return resultFromClaim(existing, payment, ownerId, nmid);
   }
+  onProgress('acquiring_lock');
   const release = await acquireLock(db);
   try {
     const rows = await scrapeBcaPayments({
       instant: payment?.instant ?? Date.now(), expectedNmid: nmid,
+      onProgress,
       ...(listOnly ? { dates: [wibDate(Date.now())] } : {}),
     });
     const latest = [...rows].sort((a, b) => b.minuteStart - a.minuteStart).slice(0, 10)

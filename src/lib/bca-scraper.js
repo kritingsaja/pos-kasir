@@ -2,7 +2,7 @@ import { BcaError, MONTHS, datesToRead, parseCreditRow } from './bca-matching.js
 
 const ORIGIN = 'https://qr.klikbca.com';
 
-export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant) }) {
+export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), onProgress = () => {} }) {
   const { BCA_USER, BCA_PASS } = process.env;
   if (!BCA_USER || !BCA_PASS) throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
   const [{ default: puppeteer }, { default: chromium }] = await Promise.all([
@@ -12,7 +12,10 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
   let page;
   let authenticated = false;
   let deadline;
+  let stage = 'launching_browser';
+  function progress(next) { stage = next; onProgress(next); }
   try {
+    progress('launching_browser');
     browser = await puppeteer.launch({
       args: puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
       executablePath: await chromium.executablePath(),
@@ -22,12 +25,14 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     page = await browser.newPage();
     page.setDefaultTimeout(15_000);
     page.setDefaultNavigationTimeout(15_000);
+    progress('opening_login');
     await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded' });
 
     // Placeholders observed on the public login screen. No CAPTCHA bypass or login retries.
     const email = 'input[placeholder="louis.briyant@mail.com"]';
     const password = 'input[placeholder="Contoh: Bca12345"]';
     await page.waitForSelector(email, { visible: true });
+    progress('logging_in');
     await page.type(email, BCA_USER);
     await page.type(password, BCA_PASS);
     const buttons = await page.$$('button');
@@ -42,6 +47,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     authenticated = true;
 
     // MID is obtained from the signed-in profile, rather than an environment variable.
+    progress('reading_merchant');
     await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Array.from(document.querySelectorAll('p')).some(p => /^MID:\s*\d+/.test(p.innerText.trim())));
     const merchant = await page.evaluate(() => {
@@ -57,6 +63,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('button.button-blue h4');
     const rows = [];
+    progress('reading_mutations');
     for (const date of dates) {
       const [year, month, day] = date.split('-').map(Number);
       void year; // The portal calendar covers the current seven days; request age is validated.
@@ -93,6 +100,10 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     }
     return rows;
   } catch (error) {
+    console.error(JSON.stringify({ event: 'bca.scraper.error', stage,
+      code: error instanceof BcaError ? error.code : 'BCA_UNAVAILABLE',
+      kind: error instanceof Error ? error.name : 'UnknownError',
+    }));
     if (error instanceof BcaError) throw error;
     throw new BcaError('BCA_UNAVAILABLE', 'Portal BCA tidak dapat dibaca saat ini. Coba lagi atau cek manual.');
   } finally {

@@ -18,6 +18,34 @@ interface CheckResult {
     error?: string;
 }
 
+interface ConfigurationResult {
+    success: boolean;
+    configured?: boolean;
+    message?: string;
+    error?: string;
+}
+
+async function readResponse<T>(response: Response): Promise<T> {
+    if (response.status === 401) throw new Error('Sesi kasir berakhir. Login kembali, lalu coba lagi.');
+    if (response.status === 403) throw new Error('Akses preview atau kasir ditolak. Login kembali ke akun yang sesuai.');
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Respons server tidak dapat dibaca. Muat ulang preview dan login kembali.');
+    }
+    return response.json() as Promise<T>;
+}
+
+async function readConfiguration(controller: AbortController): Promise<ConfigurationResult> {
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    try {
+        const response = await fetch(`/api/cek-mutasi-bca?status=${Date.now()}`, {
+            cache: 'no-store', credentials: 'same-origin', signal: controller.signal,
+        });
+        const result = await readResponse<ConfigurationResult>(response);
+        if (!response.ok || !result.success) throw new Error(result.error || 'Konfigurasi pengecekan BCA tidak dapat dibaca.');
+        return result;
+    } finally { clearTimeout(timer); }
+}
+
 interface Props {
     intent: QrisPaymentIntent;
     ready: boolean;
@@ -29,6 +57,8 @@ interface Props {
 
 export default function BcaMutasiPanel({ intent, ready, remainingCash, cashReceived, onVerified, onBusyChange }: Props) {
     const [configured, setConfigured] = useState<boolean | null>(null);
+    const [configurationMessage, setConfigurationMessage] = useState('Menyiapkan pengecekan BCA…');
+    const [phase, setPhase] = useState('');
     const [busy, setBusy] = useState(false);
     const [rows, setRows] = useState<BankRow[]>([]);
     const [candidates, setCandidates] = useState<BankRow[]>([]);
@@ -39,17 +69,23 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
 
     useEffect(() => {
         mounted.current = true;
+        let active = true;
         const controller = new AbortController();
-        void fetch('/api/cek-mutasi-bca', { cache: 'no-store', signal: controller.signal })
-            .then(async response => {
-                const result = await response.json();
-                if (mounted.current && !controller.signal.aborted) {
-                    setConfigured(response.ok && result.success && result.configured === true);
+        void readConfiguration(controller)
+            .then(result => {
+                if (active && mounted.current && !controller.signal.aborted) {
+                    setConfigured(result.configured === true);
+                    setConfigurationMessage(result.configured ? '' : result.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
                 }
-            }).catch(() => {
-                if (mounted.current && !controller.signal.aborted) setConfigured(false);
+            }).catch((error: unknown) => {
+                if (active && mounted.current) {
+                    setConfigured(false);
+                    setConfigurationMessage(error instanceof Error && error.name !== 'AbortError'
+                        ? error.message : 'Status BCA belum dapat dibaca. Tekan Cek Pembayaran QRIS untuk mencoba lagi.');
+                }
             });
         return () => {
+            active = false;
             mounted.current = false;
             controller.abort();
             pending.current?.abort();
@@ -58,7 +94,9 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     }, [onBusyChange]);
 
     async function check(mode: 'list' | 'match', rrn?: string) {
-        if (pending.current || !configured || (mode === 'match' && intent.verification)) return;
+        if (pending.current) return;
+        if (mode === 'match' && intent.verification) { setMessage('Pembayaran QRIS sudah terverifikasi.'); return; }
+        if (mode === 'match' && !ready) { setMessage('Tunggu sampai QRIS selesai dibuat.'); return; }
         const controller = new AbortController();
         pending.current = controller;
         const timer = setTimeout(() => controller.abort(), 125_000);
@@ -66,6 +104,14 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         onBusyChange(true);
         setMessage('');
         try {
+            setPhase('Memeriksa koneksi…');
+            const configuration = await readConfiguration(controller);
+            if (!mounted.current) return;
+            if (controller.signal.aborted) throw new Error('Pengecekan koneksi melewati batas waktu. Coba lagi.');
+            setConfigured(configuration.configured === true);
+            setConfigurationMessage(configuration.configured ? '' : configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
+            if (!configuration.configured) throw new Error(configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
+            setPhase('Mengecek portal BCA…');
             const response = await fetch('/api/cek-mutasi-bca', {
                 method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' },
@@ -74,8 +120,9 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                     ...(rrn ? { rrn } : {}),
                 }),
             });
-            const result: CheckResult = await response.json();
-            if (!mounted.current || controller.signal.aborted) return;
+            const result = await readResponse<CheckResult>(response);
+            if (!mounted.current) return;
+            if (controller.signal.aborted) throw new Error('Portal BCA belum merespons dalam batas waktu. Coba lagi.');
             if (!response.ok || !result.success) throw new Error(result.error || 'Pengecekan BCA gagal.');
             setCheckedAt(result.checkedAt ?? '');
             if (mode === 'list') {
@@ -97,11 +144,11 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             }
         } catch (error) {
             if (mounted.current) setMessage(error instanceof Error && error.name !== 'AbortError'
-                ? error.message : 'Pengecekan berhenti. Tekan cek lagi untuk pesanan ini.');
+                ? error.message : 'Pengecekan belum selesai. Periksa koneksi, lalu tekan cek lagi untuk pesanan ini.');
         } finally {
             clearTimeout(timer);
             if (pending.current === controller) pending.current = null;
-            if (mounted.current) { setBusy(false); onBusyChange(false); }
+            if (mounted.current) { setBusy(false); setPhase(''); onBusyChange(false); }
         }
     }
 
@@ -110,7 +157,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         <section className="bca-mutasi-panel" aria-label="Mutasi BCA" aria-busy={busy}>
             <div className="bca-mutasi-heading">
                 <strong>Mutasi BCA</strong>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={!configured || busy} onClick={() => void check('list')}>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void check('list')}>
                     <RefreshCw size={14} aria-hidden="true" /> Muat
                 </button>
             </div>
@@ -131,13 +178,13 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                     {row.rrn} · {formatRupiah(row.amount)}
                 </button>)}
             </div>}
-            <button type="button" className="btn btn-primary bca-check-button" disabled={!configured || busy || !ready || !!intent.verification}
+            <button type="button" className="btn btn-primary bca-check-button" disabled={busy || !!intent.verification}
                 onClick={() => void check('match')}>
                 {busy && <LoaderCircle size={16} className="bca-loading-icon" aria-hidden="true" />}
-                {busy ? 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Cek Pembayaran QRIS'}
+                {busy ? phase || 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Cek Pembayaran QRIS'}
             </button>
             <p className="bca-mutasi-message" role="status" aria-live="polite">
-                {message || (configured === false ? 'Pengecekan BCA belum tersedia. Periksa pembayaran secara manual.' : '')}
+                {busy ? phase : message || (configured !== true ? configurationMessage : '')}
             </p>
             {checkedAt && <small>Diperbarui {new Date(checkedAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</small>}
         </section>
