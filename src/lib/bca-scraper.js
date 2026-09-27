@@ -26,6 +26,8 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     page = await browser.newPage();
     page.setDefaultTimeout(15_000);
     page.setDefaultNavigationTimeout(15_000);
+    // QRMS builds its calendar in the browser; keep its local date aligned with WIB matching.
+    await page.emulateTimezone('Asia/Jakarta');
     progress('opening_login');
     await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded' });
 
@@ -65,7 +67,26 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     }
     progress('opening_transactions');
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('button.button-blue h4');
+    progress('reading_calendar');
+    await page.waitForFunction(() => {
+      const buttons = Array.from(document.querySelectorAll('button.button-blue'));
+      return buttons.length > 0 && buttons.every(button =>
+        /^\d{1,2}$/.test(button.querySelector('h4')?.innerText.trim() ?? '') &&
+        Boolean(button.querySelector('h6')?.innerText.trim()));
+    });
+    const calendar = await page.evaluate(() => {
+      const now = new Date();
+      return {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        browserDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+        buttons: Array.from(document.querySelectorAll('button.button-blue')).map(button => ({
+          day: button.querySelector('h4')?.innerText.trim(),
+          month: button.querySelector('h6')?.innerText.trim(),
+        })),
+      };
+    });
+    // Date labels only. Never include merchant data, bank rows, credentials or cookies.
+    console.info(JSON.stringify({ event: 'bca.calendar', requestedDates: dates, ...calendar }));
     const rows = [];
     progress('reading_mutations');
     for (const date of dates) {
@@ -76,11 +97,11 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       for (const button of dateButtons) {
         const matches = await button.evaluate((element, wanted) =>
           Number(element.querySelector('h4')?.innerText.trim()) === wanted.day &&
-          wanted.months.includes(element.querySelector('h6')?.innerText.trim()),
-        { day, months: [MONTHS[month - 1], ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1]] });
+          wanted.months.includes((element.querySelector('h6')?.innerText.trim() ?? '').replace(/\.$/, '').toLowerCase()),
+        { day, months: [MONTHS[month - 1], ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1]].map(value => value.toLowerCase()) });
         if (matches) { selected = button; break; }
       }
-      if (!selected) throw new BcaError('DATE_UNAVAILABLE', 'Tanggal pembayaran tidak tersedia di kalender QRMS.', 422);
+      if (!selected) throw new BcaError('DATE_UNAVAILABLE', `Tanggal pembayaran ${date} tidak tersedia di kalender QRMS.`, 422);
       await selected.click();
       await page.waitForNetworkIdle({ idleTime: 800, timeout: 15_000 });
       await page.waitForFunction(() => {
@@ -138,6 +159,7 @@ const STAGE_FAILURES = {
   logging_in: { code: 'BCA_LOGIN_FAILED', message: 'Login BCA dari server belum berhasil. Periksa login manual dan apakah BCA meminta verifikasi tambahan.' },
   reading_merchant: { code: 'BCA_PROFILE_UNAVAILABLE', message: 'Server belum dapat membaca profil merchant setelah proses login BCA.' },
   opening_transactions: { code: 'BCA_TRANSACTION_PAGE_UNAVAILABLE', message: 'Halaman transaksi BCA belum dapat dibuka setelah membaca profil merchant.' },
+  reading_calendar: { code: 'BCA_CALENDAR_UNAVAILABLE', message: 'Kalender transaksi BCA belum selesai dimuat atau formatnya berubah.' },
   reading_mutations: { code: 'BCA_MUTATIONS_UNAVAILABLE', message: 'Halaman BCA sudah terbuka, tetapi daftar mutasi belum dapat dibaca.' },
 };
 

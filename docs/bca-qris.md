@@ -40,11 +40,13 @@ Saat POST gagal, respons juga berisi `code`, `stage`, dan `requestId`. PWA menam
 
 ## Batas operasional
 
-Login backend dan Chromium Linux di Vercel masih memerlukan pemeriksaan pada preview. DOM authenticated diamati tanggal 27 September 2026; perubahan portal bisa menyebabkan error `PORTAL_CHANGED`/`BCA_UNAVAILABLE`. Gagal membaca portal tidak dianggap pembayaran belum ditemukan. CAPTCHA/OTP tidak dilewati; gunakan pemeriksaan manual jika bank memintanya. Perilaku login bersamaan dengan portal yang dibuka kasir belum diketahui.
+Pembacaan mutasi dan matching masih memerlukan pemeriksaan pada preview. DOM authenticated diamati tanggal 27 September 2026; perubahan portal bisa menyebabkan error `PORTAL_CHANGED`/`BCA_UNAVAILABLE`. Gagal membaca portal tidak dianggap pembayaran belum ditemukan. CAPTCHA/OTP tidak dilewati; gunakan pemeriksaan manual jika bank memintanya. Perilaku login bersamaan dengan portal yang dibuka kasir belum diketahui.
 
 Chromium 153.0.0 dipasangkan dengan Puppeteer Core 25.11.0. Chromium ini untuk Linux serverless dan tidak dijalankan langsung pada Windows. Next.js mengexternalisasi kedua paket dan menyertakan berkas bin pada tracing route. API dan PWA tidak menyimpan hasil di cache jaringan.
 
 Puppeteer 25.11 mengembalikan Promise dari `defaultArgs()`. Peluncuran browser harus memakai `await puppeteer.defaultArgs(...)` agar `launch.args` menerima array, bukan Promise. Kesalahan ini menggagalkan peluncuran sebelum halaman login BCA dibuka.
+
+Browser memakai zona waktu `Asia/Jakarta` sebelum membuka QRMS. Kalender menunggu label tanggal/bulan selesai dimuat; nama bulan dinormalisasi tanpa mengubah tanggal transaksi. Event `bca.calendar` mencatat zona waktu, tanggal browser, tanggal yang diminta, dan label kalender tanpa data merchant/pelanggan. Jika tanggal tidak tersedia, pengecekan gagal secara eksplisit dan tidak mengalokasikan mutasi ke tanggal lain. Login backend sudah mencapai pemilihan kalender pada preview; pembacaan mutasi masih perlu dikonfirmasi.
 
 ## Titik kembali
 
