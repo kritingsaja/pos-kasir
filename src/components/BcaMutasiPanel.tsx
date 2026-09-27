@@ -24,9 +24,10 @@ interface Props {
     remainingCash: number;
     cashReceived: number;
     onVerified: (verification: BcaVerification) => void;
+    onBusyChange: (busy: boolean) => void;
 }
 
-export default function BcaMutasiPanel({ intent, ready, remainingCash, cashReceived, onVerified }: Props) {
+export default function BcaMutasiPanel({ intent, ready, remainingCash, cashReceived, onVerified, onBusyChange }: Props) {
     const [configured, setConfigured] = useState<boolean | null>(null);
     const [busy, setBusy] = useState(false);
     const [rows, setRows] = useState<BankRow[]>([]);
@@ -52,8 +53,9 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             mounted.current = false;
             controller.abort();
             pending.current?.abort();
+            onBusyChange(false);
         };
-    }, []);
+    }, [onBusyChange]);
 
     async function check(mode: 'list' | 'match', rrn?: string) {
         if (pending.current || !configured || (mode === 'match' && intent.verification)) return;
@@ -61,6 +63,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         pending.current = controller;
         const timer = setTimeout(() => controller.abort(), 125_000);
         setBusy(true);
+        onBusyChange(true);
         setMessage('');
         try {
             const response = await fetch('/api/cek-mutasi-bca', {
@@ -98,7 +101,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         } finally {
             clearTimeout(timer);
             if (pending.current === controller) pending.current = null;
-            if (mounted.current) setBusy(false);
+            if (mounted.current) { setBusy(false); onBusyChange(false); }
         }
     }
 

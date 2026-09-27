@@ -24,6 +24,7 @@ export default function KasirPage() {
     const [qrisCashReceived, setQrisCashReceived] = useState<number | null>(null);
     const [qrisReady, setQrisReady] = useState(false);
     const [qrisIntent, setQrisIntent] = useState<QrisPaymentIntent | null>(null);
+    const [bcaChecking, setBcaChecking] = useState(false);
     const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
     const checkoutLock = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
@@ -642,7 +643,7 @@ export default function KasirPage() {
     }
 
     async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number) {
-        if (checkoutLock.current) return;
+        if (checkoutLock.current || bcaChecking) return;
         if (cart.length === 0) {
             showToast('Keranjang masih kosong!', 'error');
             return;
@@ -1260,7 +1261,7 @@ export default function KasirPage() {
                     <div className={`pos-cart checkout-card ${metodeBayar === 'qris' ? 'checkout-card--qris' : ''}`}>
                         <div className="checkout-header">
                             <div className="checkout-heading">
-                                <button className="checkout-back" aria-label="Kembali ke pesanan" disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification} onClick={() => setStep(isTablet ? 'selection' : 'review')}>
+                                <button className="checkout-back" aria-label="Kembali ke pesanan" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => setStep(isTablet ? 'selection' : 'review')}>
                                     <ArrowLeft size={20} aria-hidden="true" />
                                 </button>
                                 <div><span className="checkout-eyebrow">Selesaikan pesanan</span><h2>Pembayaran</h2></div>
@@ -1275,7 +1276,7 @@ export default function KasirPage() {
                                     <button
                                         type="button"
                                         aria-pressed={metodeBayar === 'tunai'}
-                                        disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
+                                        disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification}
                                         className={`payment-method ${metodeBayar === 'tunai' ? 'active' : ''}`}
                                         onClick={() => setMetodeBayar('tunai')}
                                     >
@@ -1285,7 +1286,7 @@ export default function KasirPage() {
                                     <button
                                         type="button"
                                         aria-pressed={metodeBayar === 'qris'}
-                                        disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
+                                        disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification}
                                         className={`payment-method ${metodeBayar === 'qris' ? 'active' : ''}`}
                                         onClick={() => {
                                             if (metodeBayar !== 'qris' || activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
@@ -1344,7 +1345,7 @@ export default function KasirPage() {
                                             <span className="checkout-currency">Rp</span>
                                             <input
                                                 id="qris-amount"
-                                                disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification}
+                                                disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification}
                                                 type="number"
                                                 min={1}
                                                 max={Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)}
@@ -1359,7 +1360,7 @@ export default function KasirPage() {
                                                 inputMode="numeric"
                                                 aria-describedby="qris-amount-hint"
                                             />
-                                            <button className="btn btn-sm btn-secondary" type="button" disabled={isCheckoutSubmitting || !!activeQrisIntent?.verification} onClick={() => {
+                                            <button className="btn btn-sm btn-secondary" type="button" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => {
                                                 if (activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
                                                 setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
                                                 setQrisCashReceived(null);
@@ -1436,13 +1437,14 @@ export default function KasirPage() {
                                 remainingCash={qrisRemaining}
                                 cashReceived={qrisCashAmount}
                                 onVerified={handleBcaVerified}
+                                onBusyChange={setBcaChecking}
                             />}
                         </div>
                         <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
                             <button
                                 className="btn btn-success btn-lg"
                                 onClick={() => void handleCheckout(metodeBayar)}
-                                disabled={isCheckoutSubmitting || (metodeBayar === 'qris' && !qrisReady)}
+                                disabled={isCheckoutSubmitting || bcaChecking || (metodeBayar === 'qris' && !qrisReady)}
                                 aria-busy={isCheckoutSubmitting}
                             >
                                 <Check size={18} aria-hidden="true" />
