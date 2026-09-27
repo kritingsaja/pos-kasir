@@ -8,6 +8,7 @@ import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 import QrisPaymentPanel from '@/components/QrisPaymentPanel';
 import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
+import { ArrowLeft, Banknote, Check, QrCode } from 'lucide-react';
 
 export default function KasirPage() {
     type PaymentMethod = 'tunai' | 'qris';
@@ -1217,45 +1218,43 @@ export default function KasirPage() {
 
                 {/* STEP 3: PAYMENT */}
                 {step === 'payment' && (
-                    <div className="pos-cart" style={{ gridColumn: '1 / -1', maxWidth: '500px', margin: '0 auto', width: '100%' }}>
-                        <div className="cart-header">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <button className="btn btn-sm btn-secondary" onClick={() => setStep('review')}>
-                                    ← Kembali
+                    <div className={`pos-cart checkout-card ${metodeBayar === 'qris' ? 'checkout-card--qris' : ''}`}>
+                        <div className="checkout-header">
+                            <div className="checkout-heading">
+                                <button className="checkout-back" aria-label="Kembali ke pesanan" onClick={() => setStep(isTablet ? 'selection' : 'review')}>
+                                    <ArrowLeft size={20} aria-hidden="true" />
                                 </button>
-                                <h2>💵 Pembayaran</h2>
+                                <div><span className="checkout-eyebrow">Selesaikan pesanan</span><h2>Pembayaran</h2></div>
                             </div>
+                            <div className="checkout-total"><span>Total tagihan</span><strong>{formatRupiah(total)}</strong></div>
                         </div>
 
-                        <div className="cart-items" style={{ padding: '20px' }}>
-                            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                                <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Tagihan</p>
-                                <h1 style={{ color: 'var(--success)', fontSize: '32px' }}>{formatRupiah(total)}</h1>
-                            </div>
-
-                            <div className="payment-section">
+                        <div className="checkout-body">
+                            <div className="payment-section checkout-fields">
                                 <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '13px' }}>Metode Pembayaran</p>
-                                <div className="payment-methods" role="radiogroup" aria-label="Metode pembayaran">
+                                <div className="payment-methods" role="group" aria-label="Metode pembayaran">
                                     <button
                                         type="button"
+                                        aria-pressed={metodeBayar === 'tunai'}
                                         className={`payment-method ${metodeBayar === 'tunai' ? 'active' : ''}`}
                                         onClick={() => setMetodeBayar('tunai')}
                                     >
-                                        <span>Cash</span>
-                                        <small>Uang tunai</small>
+                                        <Banknote size={20} aria-hidden="true" />
+                                        <div><span>Tunai</span><small>Uang tunai</small></div>
                                     </button>
                                     <button
                                         type="button"
+                                        aria-pressed={metodeBayar === 'qris'}
                                         className={`payment-method ${metodeBayar === 'qris' ? 'active' : ''}`}
                                         onClick={() => {
+                                            if (metodeBayar !== 'qris' || activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
                                             setMetodeBayar('qris');
                                             setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
                                             setQrisCashReceived(null);
-                                            setQrisReady(false);
                                         }}
                                     >
-                                        <span>QRIS</span>
-                                        <small>QR otomatis sesuai nominal</small>
+                                        <QrCode size={20} aria-hidden="true" />
+                                        <div><span>QRIS</span><small>Scan kode QR</small></div>
                                     </button>
                                 </div>
 
@@ -1270,9 +1269,10 @@ export default function KasirPage() {
                                     </div>
                                 </>}
 
-                                <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Nama Pelanggan (Opsional)</p>
+                                <label className="checkout-field-label" htmlFor="checkout-customer">Nama pelanggan <span>Opsional</span></label>
                                 <div className="payment-input">
                                     <input
+                                        id="checkout-customer"
                                         type="text"
                                         placeholder="Masukkan nama pelanggan..."
                                         value={namaPelanggan}
@@ -1298,18 +1298,36 @@ export default function KasirPage() {
                                     </div>
                                 </> : (
                                     <>
-                                        <QrisPaymentPanel
-                                            staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
-                                            amount={activeQrisAmount}
-                                            total={total}
-                                            remaining={qrisRemaining}
-                                            onReady={setQrisReady}
-                                            onAmountChange={(amount) => {
-                                                setQrisAmount(amount);
+                                        <label className="checkout-field-label" htmlFor="qris-amount">Nominal QRIS</label>
+                                        <div className="payment-input checkout-amount-input">
+                                            <span className="checkout-currency">Rp</span>
+                                            <input
+                                                id="qris-amount"
+                                                type="number"
+                                                min={1}
+                                                max={Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)}
+                                                step={1}
+                                                value={activeQrisAmount || ''}
+                                                onChange={(event) => {
+                                                    const nextAmount = Math.max(0, Number.parseInt(event.target.value, 10) || 0);
+                                                    if (Math.min(nextAmount, total) !== activeQrisAmount) setQrisReady(false);
+                                                    setQrisAmount(nextAmount);
+                                                    setQrisCashReceived(null);
+                                                }}
+                                                inputMode="numeric"
+                                                aria-describedby="qris-amount-hint"
+                                            />
+                                            <button className="btn btn-sm btn-secondary" type="button" onClick={() => {
+                                                if (activeQrisAmount !== Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) setQrisReady(false);
+                                                setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
                                                 setQrisCashReceived(null);
-                                                setQrisReady(false);
-                                            }}
-                                        />
+                                            }}>Bayar penuh</button>
+                                        </div>
+                                        <p className="checkout-field-hint" id="qris-amount-hint">Bisa sebagian; sisa tagihan dibayar tunai. Maks. {formatRupiah(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT))}.</p>
+                                        <div className="checkout-breakdown">
+                                            <div><span>Via QRIS</span><strong>{formatRupiah(activeQrisAmount)}</strong></div>
+                                            <div><span>Sisa tunai</span><strong>{formatRupiah(qrisRemaining)}</strong></div>
+                                        </div>
                                         {qrisRemaining > 0 && (
                                             <div className="qris-cash-remainder">
                                                 <label htmlFor="qris-cash-received">Tunai untuk sisa tagihan</label>
@@ -1327,9 +1345,10 @@ export default function KasirPage() {
                                     </>
                                 )}
 
-                                <p style={{ color: 'var(--text-secondary)', margin: '16px 0 8px', fontSize: '13px' }}>Diskon Keseluruhan (Opsional)</p>
+                                <label className="checkout-field-label" htmlFor="checkout-discount">Diskon keseluruhan <span>Opsional</span></label>
                                 <div className="payment-input" style={{ display: 'flex', gap: '8px' }}>
                                     <input
+                                        id="checkout-discount"
                                         type="number"
                                         placeholder="0"
                                         value={globalDiskon}
@@ -1361,25 +1380,26 @@ export default function KasirPage() {
                                     </div>
                                 )}
 
-                                <div className="cart-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
-                                    <button
-                                        className="btn btn-success btn-lg"
-                                        style={{ width: '100%' }}
-                                        onClick={() => void handleCheckout(metodeBayar)}
-                                        disabled={isCheckoutSubmitting}
-                                        aria-busy={isCheckoutSubmitting}
-                                    >
-                                        {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'Sudah Cek Pembayaran QRIS & Simpan' : 'Bayar & Simpan')}
-                                    </button>
-                                    <button
-                                        className="btn btn-secondary"
-                                        style={{ width: '100%', marginTop: '12px' }}
-                                        onClick={handleSaveDraft}
-                                    >
-                                        💾 Simpan Draft
-                                    </button>
-                                </div>
                             </div>
+                            {metodeBayar === 'qris' && <QrisPaymentPanel
+                                staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
+                                amount={activeQrisAmount}
+                                onReady={setQrisReady}
+                            />}
+                        </div>
+                        <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
+                            <button
+                                className="btn btn-success btn-lg"
+                                onClick={() => void handleCheckout(metodeBayar)}
+                                disabled={isCheckoutSubmitting || (metodeBayar === 'qris' && !qrisReady)}
+                                aria-busy={isCheckoutSubmitting}
+                            >
+                                <Check size={18} aria-hidden="true" />
+                                {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris' ? 'Konfirmasi Pembayaran & Simpan' : 'Bayar & Simpan')}
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleSaveDraft}>
+                                💾 Simpan Draft
+                            </button>
                         </div>
                     </div>
                 )}
