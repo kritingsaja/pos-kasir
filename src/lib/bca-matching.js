@@ -1,6 +1,7 @@
 export class BcaError extends Error {
   constructor(code, message, status = 502) {
     super(message);
+    this.name = 'BcaError';
     this.code = code;
     this.status = status;
   }

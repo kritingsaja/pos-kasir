@@ -62,11 +62,18 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
 
     if (!sessionRestored) {
       progress('opening_login');
-      await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded' });
-
       // Placeholders observed on the public login screen. No CAPTCHA bypass or login retries.
       const email = 'input[placeholder="louis.briyant@mail.com"]';
       const password = 'input[placeholder="Contoh: Bca12345"]';
+      try {
+        await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      } catch {
+        // Sometimes QRMS finishes the page lifecycle late even though its form is already usable.
+        const formIsPresent = await page.$(email).then(Boolean).catch(() => false);
+        if (!formIsPresent) {
+          throw new BcaError('BCA_LOGIN_PAGE_UNAVAILABLE', 'Halaman login QRMS belum merespons. Coba lagi atau periksa portal BCA secara manual.');
+        }
+      }
       progress('waiting_login_form');
       await page.waitForSelector(email, { visible: true });
       await page.waitForSelector(password, { visible: true });
@@ -112,7 +119,9 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       ...(cookie.sourceScheme ? { sourceScheme: cookie.sourceScheme } : {}),
       ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
     }))));
-    console.info(JSON.stringify({ event: 'bca.session', browserReused, sessionRestored, stored: sessionStored === true }));
+    const storageCounts = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }));
+    console.info(JSON.stringify({ event: 'bca.session', browserReused, sessionRestored,
+      stored: sessionStored === true, storageCounts }));
     progress('opening_transactions');
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
     progress('reading_calendar');
