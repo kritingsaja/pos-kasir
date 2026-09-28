@@ -102,13 +102,22 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
         if (matches) { selected = button; break; }
       }
       if (!selected) throw new BcaError('DATE_UNAVAILABLE', `Tanggal pembayaran ${date} tidak tersedia di kalender QRMS.`, 422);
-      await selected.click();
-      await page.waitForNetworkIdle({ idleTime: 800, timeout: 15_000 });
+      const alreadySelected = await selected.evaluate(element => element.classList.contains('highlight'));
+      if (!alreadySelected) {
+        progress('refreshing_mutations');
+        await selected.click();
+        await page.waitForFunction(wanted => Array.from(document.querySelectorAll('button.button-blue')).some(button =>
+          Number(button.querySelector('h4')?.innerText.trim()) === wanted.day &&
+          (button.querySelector('h6')?.innerText.trim() ?? '').replace(/\.$/, '').toLowerCase() === wanted.month &&
+          button.classList.contains('highlight')),
+        { timeout: 10_000 }, { day, month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1].toLowerCase() });
+      }
+      progress('reading_mutation_rows');
       await page.waitForFunction(() => {
         const count = document.body.innerText.match(/TOTAL TRANSAKSI[^()]*\(\s*(\d+)\s*\)/)?.[1];
         const actual = document.querySelectorAll('table .reference-number').length;
         return count !== undefined && ((Number(count) === 0 && document.body.innerText.includes('Transaksi tidak ada')) || (Number(count) > 0 && actual === Number(count)));
-      });
+      }, { timeout: 20_000 });
       const rawRows = await page.evaluate(() => Array.from(document.querySelectorAll('table tr'))
         .filter(row => row.querySelector('.reference-number'))
         .map(row => ({
@@ -160,6 +169,8 @@ const STAGE_FAILURES = {
   reading_merchant: { code: 'BCA_PROFILE_UNAVAILABLE', message: 'Server belum dapat membaca profil merchant setelah proses login BCA.' },
   opening_transactions: { code: 'BCA_TRANSACTION_PAGE_UNAVAILABLE', message: 'Halaman transaksi BCA belum dapat dibuka setelah membaca profil merchant.' },
   reading_calendar: { code: 'BCA_CALENDAR_UNAVAILABLE', message: 'Kalender transaksi BCA belum selesai dimuat atau formatnya berubah.' },
+  refreshing_mutations: { code: 'BCA_MUTATION_REFRESH_TIMEOUT', message: 'QRMS belum selesai membuka transaksi pada tanggal yang dipilih. Coba muat ulang daftar.' },
+  reading_mutation_rows: { code: 'BCA_MUTATION_LIST_TIMEOUT', message: 'Daftar QRIS belum selesai dimuat atau tampilannya berubah. Coba lagi atau cek manual.' },
   reading_mutations: { code: 'BCA_MUTATIONS_UNAVAILABLE', message: 'Halaman BCA sudah terbuka, tetapi daftar mutasi belum dapat dibaca.' },
 };
 
