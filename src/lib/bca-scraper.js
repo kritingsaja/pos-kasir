@@ -2,12 +2,11 @@ import { BcaError, MONTHS, datesToRead, parseCreditRow } from './bca-matching.js
 
 const ORIGIN = 'https://qr.klikbca.com';
 
-export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), onProgress = () => {} }) {
+export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), sessionCookies = null, onSessionUpdate = async () => {}, onProgress = () => {} }) {
   const { BCA_USER, BCA_PASS } = process.env;
   if (!BCA_USER || !BCA_PASS) throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
   let browser;
   let page;
-  let authenticated = false;
   let deadline;
   let stage = 'loading_dependencies';
   function progress(next) { stage = next; onProgress(next); }
@@ -28,32 +27,50 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     page.setDefaultNavigationTimeout(15_000);
     // QRMS builds its calendar in the browser; keep its local date aligned with WIB matching.
     await page.emulateTimezone('Asia/Jakarta');
-    progress('opening_login');
-    await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded' });
-
-    // Placeholders observed on the public login screen. No CAPTCHA bypass or login retries.
-    const email = 'input[placeholder="louis.briyant@mail.com"]';
-    const password = 'input[placeholder="Contoh: Bca12345"]';
-    progress('waiting_login_form');
-    await page.waitForSelector(email, { visible: true });
-    await page.waitForSelector(password, { visible: true });
-    progress('logging_in');
-    await page.type(email, BCA_USER);
-    await page.type(password, BCA_PASS);
-    const buttons = await page.$$('button');
-    const loginButton = await findByText(buttons, 'Masuk');
-    if (!loginButton) throw new BcaError('PORTAL_CHANGED', 'Tombol login QRMS berubah.');
-    await loginButton.click();
-    try {
-      await page.waitForFunction(() => location.pathname !== '/login', { timeout: 25_000 });
-    } catch {
-      throw new BcaError('BCA_LOGIN_FAILED', 'Login QRMS gagal atau memerlukan verifikasi. Periksa akun secara manual.', 502);
+    progress('reading_merchant');
+    let sessionRestored = false;
+    if (Array.isArray(sessionCookies) && sessionCookies.length > 0) {
+      progress('restoring_session');
+      try {
+        await page.setCookie(...sessionCookies);
+        await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => location.pathname === '/login' ||
+          Array.from(document.querySelectorAll('p')).some(p => /^MID:\s*\d+/.test(p.innerText.trim())),
+        { timeout: 8_000 });
+        sessionRestored = await page.evaluate(() => location.pathname !== '/login' &&
+          Array.from(document.querySelectorAll('p')).some(p => /^MID:\s*\d+/.test(p.innerText.trim())));
+      } catch {
+        sessionRestored = false;
+      }
     }
-    authenticated = true;
+
+    if (!sessionRestored) {
+      progress('opening_login');
+      await page.goto(`${ORIGIN}/login`, { waitUntil: 'domcontentloaded' });
+
+      // Placeholders observed on the public login screen. No CAPTCHA bypass or login retries.
+      const email = 'input[placeholder="louis.briyant@mail.com"]';
+      const password = 'input[placeholder="Contoh: Bca12345"]';
+      progress('waiting_login_form');
+      await page.waitForSelector(email, { visible: true });
+      await page.waitForSelector(password, { visible: true });
+      progress('logging_in');
+      await page.type(email, BCA_USER);
+      await page.type(password, BCA_PASS);
+      const buttons = await page.$$('button');
+      const loginButton = await findByText(buttons, 'Masuk');
+      if (!loginButton) throw new BcaError('PORTAL_CHANGED', 'Tombol login QRMS berubah.');
+      await loginButton.click();
+      try {
+        await page.waitForFunction(() => location.pathname !== '/login', { timeout: 25_000 });
+      } catch {
+        throw new BcaError('BCA_LOGIN_FAILED', 'Login QRMS gagal atau memerlukan verifikasi. Periksa akun secara manual.', 502);
+      }
+      await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded' });
+    }
 
     // MID is obtained from the signed-in profile, rather than an environment variable.
     progress('reading_merchant');
-    await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Array.from(document.querySelectorAll('p')).some(p => /^MID:\s*\d+/.test(p.innerText.trim())));
     const merchant = await page.evaluate(() => {
       const fields = Array.from(document.querySelectorAll('p')).map(p => p.innerText.trim());
@@ -65,6 +82,21 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     if (!merchant.mid || merchant.nmid !== expectedNmid) {
       throw new BcaError('WRONG_MERCHANT', 'Merchant pada akun BCA berbeda dari QRIS di Pengaturan.', 409);
     }
+    // Reuse the authenticated session next time, but only after verifying the expected merchant.
+    const sessionStored = await onSessionUpdate(await page.cookies(ORIGIN).then(cookies => cookies.map(cookie => ({
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path,
+      ...(cookie.expires > 0 ? { expires: cookie.expires } : {}),
+      httpOnly: cookie.httpOnly,
+      secure: cookie.secure,
+      ...(cookie.sameSite ? { sameSite: cookie.sameSite } : {}),
+      ...(cookie.priority ? { priority: cookie.priority } : {}),
+      ...(cookie.sourceScheme ? { sourceScheme: cookie.sourceScheme } : {}),
+      ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
+    }))));
+    console.info(JSON.stringify({ event: 'bca.session', reused: sessionRestored, stored: sessionStored === true }));
     progress('opening_transactions');
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
     progress('reading_calendar');
@@ -144,17 +176,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       failure?.message ?? 'Portal BCA tidak dapat dibaca saat ini. Coba lagi atau cek manual.');
   } finally {
     if (deadline) clearTimeout(deadline);
-    if (authenticated && page && !page.isClosed()) {
-      // Logout only the fresh scraper session. Never use the user's inspection-browser cookies.
-      try {
-        await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded', timeout: 4_000 });
-        const logout = await findByText(await page.$$('table tr'), 'Keluar');
-        if (logout) {
-          await logout.click();
-          await page.waitForFunction(() => location.pathname === '/login', { timeout: 3_000 });
-        }
-      } catch { /* Closing the local browser is still mandatory when portal logout fails. */ }
-    }
+    // Close the local browser but keep QRMS authenticated so its encrypted cookie can be reused.
     if (browser) await browser.close().catch(() => {});
   }
 }
@@ -169,6 +191,7 @@ const STAGE_FAILURES = {
   reading_merchant: { code: 'BCA_PROFILE_UNAVAILABLE', message: 'Server belum dapat membaca profil merchant setelah proses login BCA.' },
   opening_transactions: { code: 'BCA_TRANSACTION_PAGE_UNAVAILABLE', message: 'Halaman transaksi BCA belum dapat dibuka setelah membaca profil merchant.' },
   reading_calendar: { code: 'BCA_CALENDAR_UNAVAILABLE', message: 'Kalender transaksi BCA belum selesai dimuat atau formatnya berubah.' },
+  restoring_session: { code: 'BCA_SESSION_RESTORE_FAILED', message: 'Sesi BCA lama tidak dapat digunakan. Coba login ulang otomatis.' },
   refreshing_mutations: { code: 'BCA_MUTATION_REFRESH_TIMEOUT', message: 'QRMS belum selesai membuka transaksi pada tanggal yang dipilih. Coba muat ulang daftar.' },
   reading_mutation_rows: { code: 'BCA_MUTATION_LIST_TIMEOUT', message: 'Daftar QRIS belum selesai dimuat atau tampilannya berubah. Coba lagi atau cek manual.' },
   reading_mutations: { code: 'BCA_MUTATIONS_UNAVAILABLE', message: 'Halaman BCA sudah terbuka, tetapi daftar mutasi belum dapat dibaca.' },

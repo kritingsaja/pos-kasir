@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { createClient } from '@libsql/client';
 import { jwtVerify } from 'jose';
 import { BcaError, validatePayment, nmidFromQris, candidatePayments, publicTransaction, wibDate } from './bca-matching.js';
@@ -46,6 +46,10 @@ async function ensureTables(db) {
       account_key TEXT PRIMARY KEY, owner TEXT NOT NULL,
       lease_until INTEGER NOT NULL, last_started INTEGER NOT NULL
     )`, args: [] },
+    { sql: `CREATE TABLE IF NOT EXISTS bca_qris_session (
+      account_key TEXT PRIMARY KEY, cookie_blob TEXT NOT NULL,
+      expires_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    )`, args: [] },
   ], 'write');
   const columns = await db.execute('PRAGMA table_info(bca_qris_claims)');
   if (!columns.rows.some(column => column.name === 'transaction_id')) {
@@ -56,6 +60,83 @@ async function ensureTables(db) {
     }
   }
   await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_bca_qris_transaction ON bca_qris_claims(transaction_id)');
+}
+
+function bcaAccountKey() {
+  return createHash('sha256').update(process.env.BCA_USER.trim().toLowerCase()).digest('hex');
+}
+
+function bcaSessionKey() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new BcaError('AUTH_CONFIG', 'JWT_SECRET aplikasi harus dikonfigurasi.', 503);
+  return createHmac('sha256', secret).update('pos-kasir:bca-qris-session:v1').digest();
+}
+
+function bcaSessionCacheKey() {
+  return createHmac('sha256', bcaSessionKey()).update(bcaAccountKey()).digest('hex');
+}
+
+function encryptBcaCookies(cookies) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', bcaSessionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(cookies), 'utf8'), cipher.final()]);
+  return `v1.${iv.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}.${encrypted.toString('base64url')}`;
+}
+
+function decryptBcaCookies(blob) {
+  const [version, ivText, tagText, encryptedText] = String(blob).split('.');
+  if (version !== 'v1' || !ivText || !tagText || !encryptedText) throw new Error('Invalid BCA session');
+  const decipher = createDecipheriv('aes-256-gcm', bcaSessionKey(), Buffer.from(ivText, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tagText, 'base64url'));
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(encryptedText, 'base64url')),
+    decipher.final(),
+  ]).toString('utf8');
+  const cookies = JSON.parse(plaintext);
+  if (!Array.isArray(cookies) || cookies.length > 100) throw new Error('Invalid BCA session');
+  return cookies;
+}
+
+async function readBcaSession(db, accountKey) {
+  const now = Date.now();
+  try {
+    const result = await db.execute({
+      sql: 'SELECT cookie_blob, expires_at FROM bca_qris_session WHERE account_key = ?', args: [accountKey],
+    });
+    const row = result.rows[0];
+    if (!row) return null;
+    if (Number(row.expires_at) <= now) {
+      await db.execute({ sql: 'DELETE FROM bca_qris_session WHERE account_key = ?', args: [accountKey] });
+      return null;
+    }
+    return decryptBcaCookies(String(row.cookie_blob));
+  } catch {
+    // A missing, expired or unreadable cache only means this request must sign in again.
+    await db.execute({ sql: 'DELETE FROM bca_qris_session WHERE account_key = ?', args: [accountKey] }).catch(() => {});
+    return null;
+  }
+}
+
+async function saveBcaSession(db, accountKey, cookies) {
+  try {
+    if (!Array.isArray(cookies) || cookies.length === 0 || cookies.length > 100) return false;
+    const now = Date.now();
+    const expirations = cookies.map(cookie => Number(cookie.expires)).filter(value => Number.isFinite(value) && value > now / 1000);
+    const expiresAt = Math.min(now + 8 * 60 * 60 * 1000,
+      expirations.length ? Math.min(...expirations) * 1000 : now + 8 * 60 * 60 * 1000);
+    if (expiresAt <= now) return false;
+    const cookieBlob = encryptBcaCookies(cookies);
+    await db.execute({
+      sql: `INSERT INTO bca_qris_session (account_key, cookie_blob, expires_at, updated_at)
+        VALUES (?, ?, ?, ?) ON CONFLICT(account_key) DO UPDATE SET
+        cookie_blob = excluded.cookie_blob, expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
+      args: [accountKey, cookieBlob, expiresAt, now],
+    });
+    return true;
+  } catch {
+    // Cache persistence is best-effort; a successful BCA check must still succeed.
+    return false;
+  }
 }
 
 export async function authenticatedBcaUser(cookie) {
@@ -104,7 +185,7 @@ async function acquireLock(db) {
   if (!process.env.BCA_USER || !process.env.BCA_PASS) {
     throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
   }
-  const key = createHash('sha256').update(process.env.BCA_USER.trim().toLowerCase()).digest('hex');
+  const key = bcaAccountKey();
   const owner = randomUUID();
   const now = Date.now();
   const acquired = await db.execute({
@@ -143,8 +224,12 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
   onProgress('acquiring_lock');
   const release = await acquireLock(db);
   try {
+    const sessionCacheKey = bcaSessionCacheKey();
+    const sessionCookies = await readBcaSession(db, sessionCacheKey);
     const rows = await scrapeBcaPayments({
       instant: payment?.instant ?? Date.now(), expectedNmid: nmid,
+      sessionCookies,
+      onSessionUpdate: cookies => saveBcaSession(db, sessionCacheKey, cookies),
       onProgress,
       ...(listOnly ? { dates: [wibDate(Date.now())] } : {}),
     });
