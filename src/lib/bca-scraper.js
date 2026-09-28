@@ -23,7 +23,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       import('puppeteer-core'), import('@sparticuz/chromium'),
     ]);
     progress('launching_browser');
-    if (reusableBrowser?.isConnected()) {
+    if (reusableBrowser?.connected) {
       browser = reusableBrowser;
       browserReused = true;
       clearTimeout(reusableBrowserIdleTimer);
@@ -206,7 +206,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
   } finally {
     if (deadline) clearTimeout(deadline);
     if (page && !page.isClosed()) await page.close().catch(() => {});
-    if (browser && browser === reusableBrowser && browser.isConnected()) {
+    if (browser && browser === reusableBrowser && browser.connected) {
       clearTimeout(reusableBrowserIdleTimer);
       reusableBrowserIdleTimer = setTimeout(() => {
         if (reusableBrowser === browser) reusableBrowser = undefined;
