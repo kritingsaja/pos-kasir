@@ -108,6 +108,9 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         onBusyChange(true);
         setMessage('');
         setDiagnostic('');
+        setCandidates([]);
+        setRows([]);
+        setCheckedAt('');
         try {
             setPhase('Memeriksa koneksi…');
             const configuration = await readConfiguration(controller);

@@ -1,6 +1,6 @@
 # Pengecekan QRIS BCA
 
-Endpoint: `/api/cek-mutasi-bca`, Next.js App Router, Node.js, maksimal 120 detik. Login BCA dilakukan pada sesi Chromium baru, menggunakan `BCA_USER` dan `BCA_PASS` di server. Cookie BCA tidak dikirim ke PWA.
+Endpoint: `/api/cek-mutasi-bca`, Next.js App Router, Node.js, maksimal 120 detik. Browser dan tab yang sudah terautentikasi digunakan kembali selama instance Vercel masih hidup. Browser ditutup setelah idle 10 menit atau umur sesi 8 jam. Instance baru mencoba cookie terenkripsi, lalu login hanya jika QRMS menampilkan form login. Cookie BCA tidak dikirim ke PWA.
 
 ## Mengaktifkan di Vercel
 
@@ -39,6 +39,12 @@ Saat POST gagal, respons juga berisi `code`, `stage`, dan `requestId`. PWA menam
 - Transaksi yang sudah dikonfirmasi manual sebelum integrasi belum mempunyai claim; lakukan rekonsiliasi sebelum mengandalkan pencocokan otomatis untuk mutasi lama.
 
 ## Batas operasional
+
+Navigasi menunggu layar QRMS siap, bukan hanya perubahan URL atau selesainya request dokumen. Timeout navigasi masih diberi kesempatan untuk menyelesaikan render form. GET halaman yang gagal sementara boleh dicoba sekali lagi; submit kredensial hanya sekali. HTTP error, kegagalan jaringan/TLS, verifikasi tambahan, dan form yang belum siap dibedakan. Event `bca.navigation` hanya memuat status HTTP, kode jaringan, jenis layar, waktu, serta boolean/jumlah karakter DOM; tidak berisi URL dengan query, HTML, kredensial, cookie, atau data transaksi.
+
+Kegagalan membuka profil tidak dianggap logout. Setelah login, MID dan NMID harus sudah tersedia sebelum memilih merchant. Ketika tanggal kalender diganti, permintaan XHR/fetch QRMS harus selesai sebelum membaca baris; highlight kalender saja tidak cukup. Bulan Indonesia dan Inggris diterima secara konsisten. Daftar dan kandidat lama di PWA dibersihkan saat permintaan baru dimulai.
+
+Deadline scraper mencakup seluruh alur dalam 95 detik sejak pemanggilan scraper. Cleanup browser diberi batas 3 detik, dan lock database tetap memiliki lease 150 detik sebagai pengaman ketika fungsi dihentikan. Reuse browser memakai properti `connected` dari Puppeteer 25, bukan method `isConnected()` yang sudah tidak tersedia.
 
 Pembacaan mutasi dan matching masih memerlukan pemeriksaan pada preview. DOM authenticated diamati tanggal 27 September 2026; perubahan portal bisa menyebabkan error `PORTAL_CHANGED`/`BCA_UNAVAILABLE`. Gagal membaca portal tidak dianggap pembayaran belum ditemukan. CAPTCHA/OTP tidak dilewati; gunakan pemeriksaan manual jika bank memintanya. Perilaku login bersamaan dengan portal yang dibuka kasir belum diketahui.
 

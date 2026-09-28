@@ -41,13 +41,7 @@ export async function POST(request) {
     console.info(JSON.stringify({ event: 'bca.check.finish', requestId, matched: body.matched ?? null, durationMs: Date.now() - start }));
     return Response.json(body, { headers: noCacheHeaders });
   } catch (error) {
-    let result = errorResponse(error);
-    if (result.body.code === 'INTERNAL_ERROR' && stage === 'opening_login') {
-      result = { status: 502, body: {
-        success: false, code: 'BCA_LOGIN_PAGE_UNAVAILABLE',
-        error: 'Halaman login QRMS belum merespons. Coba lagi atau periksa portal BCA secara manual.',
-      } };
-    }
+    const result = errorResponse(error);
     console.error(JSON.stringify({ event: 'bca.check.error', requestId, stage, code: result.body.code, status: result.status, durationMs: Date.now() - start }));
     return Response.json({ ...result.body, stage, requestId }, {
       status: result.status,
