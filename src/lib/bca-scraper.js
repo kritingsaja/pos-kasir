@@ -191,9 +191,13 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     }
     return rows;
   } catch (error) {
+    const launchDetail = stage === 'launching_browser' && error instanceof Error
+      ? error.message.replace(/[\r\n\t]+/g, ' ').slice(0, 240)
+      : undefined;
     console.error(JSON.stringify({ event: 'bca.scraper.error', stage,
       code: error instanceof BcaError ? error.code : 'BCA_UNAVAILABLE',
       kind: error instanceof Error ? error.name : 'UnknownError',
+      ...(launchDetail ? { detail: launchDetail } : {}),
     }));
     if (error instanceof BcaError) throw error;
     const failure = STAGE_FAILURES[stage];
