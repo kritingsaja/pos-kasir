@@ -1,12 +1,19 @@
 import { BcaError, MONTHS, datesToRead, parseCreditRow } from './bca-matching.js';
 
 const ORIGIN = 'https://qr.klikbca.com';
+const BROWSER_IDLE_TIMEOUT_MS = 10 * 60_000;
+
+// Reuse a QRMS browser profile while this Vercel function instance stays warm.
+// Vercel may replace the instance at any time; the encrypted cookie cache is the fallback.
+let reusableBrowser;
+let reusableBrowserIdleTimer;
 
 export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), sessionCookies = null, onSessionUpdate = async () => {}, onProgress = () => {} }) {
   const { BCA_USER, BCA_PASS } = process.env;
   if (!BCA_USER || !BCA_PASS) throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
   let browser;
   let page;
+  let browserReused = false;
   let deadline;
   let stage = 'loading_dependencies';
   function progress(next) { stage = next; onProgress(next); }
@@ -16,11 +23,20 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       import('puppeteer-core'), import('@sparticuz/chromium'),
     ]);
     progress('launching_browser');
-    browser = await puppeteer.launch({
-      args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
-      executablePath: await chromium.executablePath(),
-      headless: 'shell', defaultViewport: { width: 1280, height: 900 }, timeout: 25_000,
-    });
+    if (reusableBrowser?.isConnected()) {
+      browser = reusableBrowser;
+      browserReused = true;
+      clearTimeout(reusableBrowserIdleTimer);
+      reusableBrowserIdleTimer = undefined;
+    } else {
+      reusableBrowser = undefined;
+      browser = await puppeteer.launch({
+        args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
+        executablePath: await chromium.executablePath(),
+        headless: 'shell', defaultViewport: { width: 1280, height: 900 }, timeout: 25_000,
+      });
+      reusableBrowser = browser;
+    }
     deadline = setTimeout(() => { void browser.close().catch(() => {}); }, 80_000);
     page = await browser.newPage();
     page.setDefaultTimeout(15_000);
@@ -29,10 +45,10 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     await page.emulateTimezone('Asia/Jakarta');
     progress('reading_merchant');
     let sessionRestored = false;
-    if (Array.isArray(sessionCookies) && sessionCookies.length > 0) {
+    if (browserReused || (Array.isArray(sessionCookies) && sessionCookies.length > 0)) {
       progress('restoring_session');
       try {
-        await page.setCookie(...sessionCookies);
+        if (!browserReused) await page.setCookie(...sessionCookies);
         await page.goto(`${ORIGIN}/menu`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => location.pathname === '/login' ||
           Array.from(document.querySelectorAll('p')).some(p => /^MID:\s*\d+/.test(p.innerText.trim())),
@@ -96,7 +112,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       ...(cookie.sourceScheme ? { sourceScheme: cookie.sourceScheme } : {}),
       ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
     }))));
-    console.info(JSON.stringify({ event: 'bca.session', reused: sessionRestored, stored: sessionStored === true }));
+    console.info(JSON.stringify({ event: 'bca.session', browserReused, sessionRestored, stored: sessionStored === true }));
     progress('opening_transactions');
     await page.goto(`${ORIGIN}/home?mid=${encodeURIComponent(merchant.mid)}`, { waitUntil: 'domcontentloaded' });
     progress('reading_calendar');
@@ -176,8 +192,17 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       failure?.message ?? 'Portal BCA tidak dapat dibaca saat ini. Coba lagi atau cek manual.');
   } finally {
     if (deadline) clearTimeout(deadline);
-    // Close the local browser but keep QRMS authenticated so its encrypted cookie can be reused.
-    if (browser) await browser.close().catch(() => {});
+    if (page && !page.isClosed()) await page.close().catch(() => {});
+    if (browser && browser === reusableBrowser && browser.isConnected()) {
+      clearTimeout(reusableBrowserIdleTimer);
+      reusableBrowserIdleTimer = setTimeout(() => {
+        if (reusableBrowser === browser) reusableBrowser = undefined;
+        void browser.close().catch(() => {});
+      }, BROWSER_IDLE_TIMEOUT_MS);
+      reusableBrowserIdleTimer.unref?.();
+    } else if (browser) {
+      await browser.close().catch(() => {});
+    }
   }
 }
 
