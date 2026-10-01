@@ -28,7 +28,7 @@ export function validatePayment(input, now = Date.now()) {
   if (input.checkoutId !== undefined && (typeof input.checkoutId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(input.checkoutId))) {
     throw new BcaError('INVALID_CHECKOUT', 'ID pesanan tidak valid.', 400);
   }
-  if (input.rrn !== undefined && (typeof input.rrn !== 'string' || !/^\d{12}$/.test(input.rrn))) {
+  if (input.rrn !== undefined && (typeof input.rrn !== 'string' || input.rrn.length !== 12 || !/^[A-Za-z0-9]{12}$/.test(input.rrn))) {
     throw new BcaError('INVALID_RRN', 'RRN tidak valid.', 400);
   }
   return { ...input, instant, timestamp: new Date(instant).toISOString() };
@@ -67,7 +67,8 @@ export function nmidFromQris(payload) {
 export function parseCreditRow(row, date) {
   // Only the positive incoming-payment rows observed in QRMS are eligible.
   if (!/^Menerima pembayaran dari\b/i.test(row.description?.trim() ?? '')) return null;
-  const reference = row.reference?.trim().match(/^RRN:\s*(\d{12})\s*\|\s*(\d{2})[.:](\d{2})\s+WIB$/);
+  // QRMS wallet references (including DANA) can contain letters; preserve the exact bank identifier.
+  const reference = row.reference?.trim().match(/^RRN:\s*([A-Za-z0-9]{12})\s*\|\s*(\d{2})[.:](\d{2})\s+WIB$/);
   const merchant = row.merchant?.match(/\bNMID:\s*(ID\d{13})\b/);
   const nominal = row.amount?.trim().match(/^\+\s*Rp\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{2}))?$/);
   if (!reference || !merchant || !nominal || (nominal[2] && nominal[2] !== '00')) {
@@ -105,3 +106,4 @@ export function publicTransaction(row) {
   const { minuteStart, minuteEnd, ...result } = row;
   return result;
 }
+
