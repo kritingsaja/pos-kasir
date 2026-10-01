@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, LoaderCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, LoaderCircle } from 'lucide-react';
 import type { BcaVerification, QrisPaymentIntent } from '@/lib/bca-payment';
 import { formatRupiah } from '@/lib/utils';
 
@@ -85,7 +85,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 if (active && mounted.current) {
                     setConfigured(false);
                     setConfigurationMessage(error instanceof Error && error.name !== 'AbortError'
-                        ? error.message : 'Status BCA belum dapat dibaca. Tekan Cek Pembayaran QRIS untuk mencoba lagi.');
+                        ? error.message : 'Status BCA belum dapat dibaca. Tekan Muat untuk mencoba lagi.');
                 }
             });
         return () => {
@@ -119,7 +119,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             setConfigured(configuration.configured === true);
             setConfigurationMessage(configuration.configured ? '' : configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
             if (!configuration.configured) throw new Error(configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
-            setPhase('Mengecek portal BCA…');
+            setPhase('Memuat dan mencocokkan mutasi BCA…');
             const response = await fetch('/api/cek-mutasi-bca', {
                 method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
                 headers: { 'Content-Type': 'application/json' },
@@ -168,9 +168,6 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         <section className="bca-mutasi-panel" aria-label="Mutasi BCA" aria-busy={busy}>
             <div className="bca-mutasi-heading">
                 <strong>Mutasi BCA</strong>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void check('list')}>
-                    <RefreshCw size={14} aria-hidden="true" /> Muat
-                </button>
             </div>
             {intent.verification && <div className="bca-payment-confirmed"><CheckCircle2 size={16} aria-hidden="true" />
                 <span>{paid ? 'LUNAS' : 'QRIS diterima · menunggu tunai'}</span>
@@ -180,7 +177,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                     <thead><tr><th scope="col">RRN</th><th scope="col">Jumlah</th></tr></thead>
                     <tbody>{rows.map(row => <tr key={`${row.date ?? ''}:${row.rrn}`}><td>{row.rrn}</td><td>{formatRupiah(row.amount)}</td></tr>)}</tbody>
                 </table>
-                {!rows.length && <p className="bca-mutasi-empty">Tekan Muat untuk melihat transaksi terbaru.</p>}
+                {!rows.length && <p className="bca-mutasi-empty">Tekan Muat untuk memuat dan mencocokkan transaksi terbaru.</p>}
             </div>
             {candidates.length > 1 && <div className="bca-mutasi-candidates">
                 <p>Pilih RRN sesuai bukti pembayaran pelanggan:</p>
@@ -192,7 +189,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             <button type="button" className="btn btn-primary bca-check-button" disabled={busy || !!intent.verification}
                 onClick={() => void check('match')}>
                 {busy && <LoaderCircle size={16} className="bca-loading-icon" aria-hidden="true" />}
-                {busy ? phase || 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Cek Pembayaran QRIS'}
+                {busy ? phase || 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Muat'}
             </button>
             <p className="bca-mutasi-message" role="status" aria-live="polite">
                 {busy ? phase : message || (configured !== true ? configurationMessage : '')}

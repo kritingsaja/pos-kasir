@@ -27,6 +27,7 @@ export default function KasirPage() {
     const [bcaChecking, setBcaChecking] = useState(false);
     const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
     const checkoutLock = useRef(false);
+    const bcaWarmupStarted = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
     type DraftRow = {
         id: number;
@@ -154,6 +155,22 @@ export default function KasirPage() {
             vv?.removeEventListener('scroll', onViewportResize);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (bcaWarmupStarted.current) return;
+        bcaWarmupStarted.current = true;
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 115_000);
+        void fetch('/api/cek-mutasi-bca', {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'warmup' }),
+        }).catch(() => {}).finally(() => window.clearTimeout(timer));
+        // Warm the BCA session in the background; it must not block the cashier UI.
     }, []);
 
     useEffect(() => {

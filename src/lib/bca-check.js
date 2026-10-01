@@ -208,8 +208,9 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
     throw new BcaError('FORBIDDEN', 'Permintaan harus berasal dari aplikasi kasir.', 403);
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new BcaError('INVALID_BODY', 'JSON tidak valid.', 400);
+  const warmupOnly = input.mode === 'warmup';
   const listOnly = input.mode === 'list';
-  const payment = listOnly ? null : validatePayment(input);
+  const payment = listOnly || warmupOnly ? null : validatePayment(input);
   if (payment) payment.checkoutId ??= randomUUID();
   const db = getDatabase();
   onProgress('authenticating_pos');
@@ -231,11 +232,12 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
       sessionCookies,
       onSessionUpdate: cookies => saveBcaSession(db, sessionCacheKey, cookies),
       onProgress,
-      ...(listOnly ? { dates: [wibDate(Date.now())] } : {}),
+      ...(listOnly || warmupOnly ? { dates: [wibDate(Date.now())] } : {}),
     });
     const latest = [...rows].sort((a, b) => b.minuteStart - a.minuteStart).slice(0, 10)
       .map(({ rrn, amount }) => ({ rrn, amount }));
     const checkedAt = new Date().toISOString();
+    if (warmupOnly) return { success: true, warmed: true, checkedAt };
     if (listOnly) return { success: true, data: latest, checkedAt };
 
     const bankDates = [...new Set(rows.map(row => row.date))];

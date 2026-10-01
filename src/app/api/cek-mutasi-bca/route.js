@@ -31,7 +31,8 @@ export async function POST(request) {
     if (Buffer.byteLength(text) > 4096) throw new BcaError('INVALID_BODY', 'Permintaan terlalu besar.', 413);
     let input;
     try { input = JSON.parse(text); } catch { throw new BcaError('INVALID_BODY', 'JSON tidak valid.', 400); }
-    console.info(JSON.stringify({ event: 'bca.check.start', requestId, mode: input?.mode === 'list' ? 'list' : 'match' }));
+    const mode = input?.mode === 'warmup' ? 'warmup' : input?.mode === 'list' ? 'list' : 'match';
+    console.info(JSON.stringify({ event: 'bca.check.start', requestId, mode }));
     const body = await checkMutasiBca({ input, cookie: request.headers.get('cookie'), fetchSite: request.headers.get('sec-fetch-site'),
       onProgress: next => {
         stage = next;
