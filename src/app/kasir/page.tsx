@@ -1473,6 +1473,15 @@ export default function KasirPage() {
                                         Ubah pembayaran
                                     </button>
                                 </div>
+                                {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
+                                    key={activeQrisIntent.checkoutId}
+                                    intent={activeQrisIntent}
+                                    ready={qrisReady}
+                                    remainingCash={qrisRemaining}
+                                    cashReceived={qrisCashAmount}
+                                    onVerified={handleBcaVerified}
+                                    onBusyChange={setBcaChecking}
+                                />}
                                 <QrisPaymentPanel
                                     staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
                                     amount={activeQrisAmount}
@@ -1497,15 +1506,6 @@ export default function KasirPage() {
                                         <small>Minimal {formatRupiah(qrisRemaining)}.</small>
                                     </div>
                                 )}
-                                {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
-                                    key={activeQrisIntent.checkoutId}
-                                    intent={activeQrisIntent}
-                                    ready={qrisReady}
-                                    remainingCash={qrisRemaining}
-                                    cashReceived={qrisCashAmount}
-                                    onVerified={handleBcaVerified}
-                                    onBusyChange={setBcaChecking}
-                                />}
                                 {qrisRemaining > 0 && activeQrisIntent?.verification && (
                                     <button type="button" className="btn btn-success btn-lg" disabled={isCheckoutSubmitting || bcaChecking || qrisCashAmount < qrisRemaining} onClick={() => void handleCheckout('qris')}>
                                         <Check size={18} aria-hidden="true" /> Simpan Pembayaran
