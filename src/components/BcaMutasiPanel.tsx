@@ -189,7 +189,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
             <button type="button" className="btn btn-primary bca-check-button" disabled={busy || !!intent.verification}
                 onClick={() => void check('match')}>
                 {busy && <LoaderCircle size={16} className="bca-loading-icon" aria-hidden="true" />}
-                {busy ? phase || 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Muat'}
+                {busy ? phase || 'Sedang mengecek…' : intent.verification ? 'QRIS sudah terverifikasi' : 'Cek Pembayaran'}
             </button>
             <p className="bca-mutasi-message" role="status" aria-live="polite">
                 {busy ? phase : message || (configured !== true ? configurationMessage : '')}

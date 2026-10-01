@@ -29,6 +29,7 @@ export default function KasirPage() {
     const checkoutLock = useRef(false);
     const bcaWarmupStarted = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
+    const [showQrisPaymentPage, setShowQrisPaymentPage] = useState(false);
     type DraftRow = {
         id: number;
         nama_draft: string;
@@ -523,7 +524,9 @@ export default function KasirPage() {
         setQrisIntent(current => current?.checkoutId === verification.checkoutId &&
             current.amount === verification.amount && current.timestamp === verification.timestamp
             ? { ...current, verification } : current);
-    }, []);
+        const cashComplete = qrisRemaining === 0 || qrisCashAmount >= qrisRemaining;
+        if (cashComplete) void handleCheckout('qris', undefined, verification);
+    }, [qrisCashAmount, qrisRemaining]);
 
     function showToast(message: string, type: string = 'success') {
         setToast({ message, type });
@@ -659,12 +662,13 @@ export default function KasirPage() {
         }
     }
 
-    async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number) {
-        if (checkoutLock.current || bcaChecking) return;
+    async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number, forcedVerification?: BcaVerification) {
+        if (checkoutLock.current || (bcaChecking && !forcedVerification)) return;
         if (cart.length === 0) {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
+        const qrisVerification = forcedVerification ?? activeQrisIntent?.verification;
         const qrisPayload = settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD;
         if (method === 'qris') {
             if (!Number.isSafeInteger(activeQrisAmount) || activeQrisAmount < 1 || activeQrisAmount > Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) {
@@ -692,7 +696,7 @@ export default function KasirPage() {
             showToast('Jumlah bayar kurang!', 'error');
             return;
         }
-        if (method === 'qris' && activeQrisIntent?.verification && !isOnline) {
+        if (method === 'qris' && qrisVerification && !isOnline) {
             showToast('Hubungkan internet untuk menyimpan pembayaran yang terverifikasi BCA.', 'error');
             return;
         }
@@ -723,7 +727,7 @@ export default function KasirPage() {
                 : { tunai: total }),
             kasir: 'Admin',
             nama_pelanggan: namaPelanggan.trim(),
-            ...(method === 'qris' && activeQrisIntent?.verification ? { bca_verification: activeQrisIntent.verification } : {}),
+            ...(method === 'qris' && qrisVerification ? { bca_verification: qrisVerification } : {}),
         };
 
         try {
@@ -1278,15 +1282,15 @@ export default function KasirPage() {
                     <div className={`pos-cart checkout-card ${metodeBayar === 'qris' ? 'checkout-card--qris' : ''}`}>
                         <div className="checkout-header">
                             <div className="checkout-heading">
-                                <button className="checkout-back" aria-label="Kembali ke pesanan" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => setStep(isTablet ? 'selection' : 'review')}>
+                                <button className="checkout-back" aria-label="Kembali" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => showQrisPaymentPage ? setShowQrisPaymentPage(false) : setStep(isTablet ? 'selection' : 'review')}>
                                     <ArrowLeft size={20} aria-hidden="true" />
                                 </button>
-                                <div><span className="checkout-eyebrow">Selesaikan pesanan</span><h2>Pembayaran</h2></div>
+                                <div><span className="checkout-eyebrow">Selesaikan pesanan</span><h2>{showQrisPaymentPage ? 'Pembayaran QRIS' : 'Pembayaran'}</h2></div>
                             </div>
                             <div className="checkout-total"><span>Total tagihan</span><strong>{formatRupiah(total)}</strong></div>
                         </div>
 
-                        <div className="checkout-body">
+                        {!showQrisPaymentPage && <div className="checkout-body">
                             <div className="payment-section checkout-fields">
                                 <p style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '13px' }}>Metode Pembayaran</p>
                                 <div className="payment-methods" role="group" aria-label="Metode pembayaran">
@@ -1310,6 +1314,7 @@ export default function KasirPage() {
                                             setMetodeBayar('qris');
                                             setQrisAmount(Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT));
                                             setQrisCashReceived(null);
+                                            setShowQrisPaymentPage(true);
                                         }}
                                     >
                                         <QrCode size={20} aria-hidden="true" />
@@ -1456,8 +1461,59 @@ export default function KasirPage() {
                                 onVerified={handleBcaVerified}
                                 onBusyChange={setBcaChecking}
                             />}
-                        </div>
-                        <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
+                        </div>}
+                        {showQrisPaymentPage && (
+                            <div className="qris-payment-page" style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', padding: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                                    <div>
+                                        <strong style={{ display: 'block', fontSize: '18px' }}>Scan QRIS pelanggan</strong>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Total {formatRupiah(total)}</span>
+                                    </div>
+                                    <button type="button" className="btn btn-secondary btn-sm" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => setShowQrisPaymentPage(false)}>
+                                        Ubah pembayaran
+                                    </button>
+                                </div>
+                                <QrisPaymentPanel
+                                    staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
+                                    amount={activeQrisAmount}
+                                    onReady={setQrisReady}
+                                />
+                                <div className="checkout-breakdown">
+                                    <div><span>Via QRIS</span><strong>{formatRupiah(activeQrisAmount)}</strong></div>
+                                    <div><span>Sisa tunai</span><strong>{formatRupiah(qrisRemaining)}</strong></div>
+                                </div>
+                                {qrisRemaining > 0 && (
+                                    <div className="qris-cash-remainder">
+                                        <label htmlFor="qris-cash-received-page">Tunai untuk sisa tagihan</label>
+                                        <input
+                                            id="qris-cash-received-page"
+                                            type="number"
+                                            min={qrisRemaining}
+                                            value={qrisCashReceived ?? ''}
+                                            placeholder={String(qrisRemaining)}
+                                            onChange={(event) => setQrisCashReceived(event.target.value === '' ? null : (Number.parseInt(event.target.value, 10) || 0))}
+                                            inputMode="numeric"
+                                        />
+                                        <small>Minimal {formatRupiah(qrisRemaining)}.</small>
+                                    </div>
+                                )}
+                                {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
+                                    key={activeQrisIntent.checkoutId}
+                                    intent={activeQrisIntent}
+                                    ready={qrisReady}
+                                    remainingCash={qrisRemaining}
+                                    cashReceived={qrisCashAmount}
+                                    onVerified={handleBcaVerified}
+                                    onBusyChange={setBcaChecking}
+                                />}
+                                {qrisRemaining > 0 && activeQrisIntent?.verification && (
+                                    <button type="button" className="btn btn-success btn-lg" disabled={isCheckoutSubmitting || bcaChecking || qrisCashAmount < qrisRemaining} onClick={() => void handleCheckout('qris')}>
+                                        <Check size={18} aria-hidden="true" /> Simpan Pembayaran
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {!showQrisPaymentPage && <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
                             <button
                                 className="btn btn-success btn-lg"
                                 onClick={() => void handleCheckout(metodeBayar)}
