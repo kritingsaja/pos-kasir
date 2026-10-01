@@ -17,6 +17,9 @@ export async function POST(request: Request) {
       const txData = pendingTx.data;
 
       try {
+        // Bank-verified payments must use the atomic validation path, never offline bulk sync.
+        if (txData.bca_verification) continue;
+        if (typeof txData.rincian_bayar === 'string' && JSON.parse(txData.rincian_bayar || '{}').bca) continue;
         await addTransactionIdempotent(txData);
         syncedIds.push(idbId);
       } catch (err: unknown) {

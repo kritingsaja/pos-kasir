@@ -11,6 +11,14 @@ const withPWA = withPWAInit({
   workboxOptions: {
     disableDevLogs: true,
     runtimeCaching: [{
+      urlPattern: /\/api\/cek-mutasi-bca(?:\?.*)?$/,
+      handler: 'NetworkOnly',
+      method: 'GET',
+    }, {
+      urlPattern: /\/api\/cek-mutasi-bca(?:\?.*)?$/,
+      handler: 'NetworkOnly',
+      method: 'POST',
+    }, {
       urlPattern: /\/api\/(admin|v1)\//,
       handler: 'NetworkOnly',
       method: 'GET',
@@ -19,7 +27,10 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  // Add any specific config here
+  serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+  outputFileTracingIncludes: {
+    '/api/cek-mutasi-bca': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+  },
 };
 
 export default withPWA(nextConfig);
