@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, LoaderCircle } from 'lucide-react';
+import { CheckCircle2, LoaderCircle, List, X } from 'lucide-react';
 import type { BcaVerification, QrisPaymentIntent } from '@/lib/bca-payment';
 import { formatRupiah } from '@/lib/utils';
 
@@ -56,9 +56,12 @@ interface Props {
     cashReceived: number;
     onVerified: (verification: BcaVerification) => void;
     onBusyChange: (busy: boolean) => void;
+    compact?: boolean;
+    disabled?: boolean;
+    onManualConfirm?: () => void;
 }
 
-export default function BcaMutasiPanel({ intent, ready, remainingCash, cashReceived, onVerified, onBusyChange }: Props) {
+export default function BcaMutasiPanel({ intent, ready, remainingCash, cashReceived, onVerified, onBusyChange, compact = false, disabled = false, onManualConfirm }: Props) {
     const [configured, setConfigured] = useState<boolean | null>(null);
     const [configurationMessage, setConfigurationMessage] = useState('Menyiapkan pengecekan BCA…');
     const [phase, setPhase] = useState('');
@@ -70,6 +73,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     const [checkedAt, setCheckedAt] = useState('');
     const pending = useRef<AbortController | null>(null);
     const mounted = useRef(false);
+    const detailDialog = useRef<HTMLDialogElement>(null);
 
     useEffect(() => {
         mounted.current = true;
@@ -85,7 +89,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 if (active && mounted.current) {
                     setConfigured(false);
                     setConfigurationMessage(error instanceof Error && error.name !== 'AbortError'
-                        ? error.message : 'Status BCA belum dapat dibaca. Tekan Muat untuk mencoba lagi.');
+                        ? error.message : 'Status BCA belum dapat dibaca. Tekan Cek Pembayaran untuk mencoba lagi.');
                 }
             });
         return () => {
@@ -98,7 +102,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     }, [onBusyChange]);
 
     async function check(mode: 'list' | 'match', rrn?: string) {
-        if (pending.current) return;
+        if (pending.current || disabled) return;
         if (mode === 'match' && intent.verification) { setMessage('Pembayaran QRIS sudah terverifikasi.'); return; }
         if (mode === 'match' && !ready) { setMessage('Tunggu sampai QRIS selesai dibuat.'); return; }
         const controller = new AbortController();
@@ -164,6 +168,50 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     }
 
     const paid = Boolean(intent.verification) && cashReceived >= remainingCash;
+    if (compact) return (
+        <section className="bca-payment-actions" aria-label="Status pembayaran" aria-busy={busy}>
+            {!intent.verification && <button type="button" className="btn btn-primary bca-check-button"
+                disabled={busy || disabled || !ready} onClick={() => void check('match')}>
+                {busy ? <LoaderCircle size={18} className="bca-loading-icon" aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
+                {busy ? 'Memeriksa pembayaran...' : 'Cek Pembayaran'}
+            </button>}
+            <div className="bca-payment-status" role="status" aria-live="polite">
+                {intent.verification ? <span className="bca-paid"><CheckCircle2 size={16} aria-hidden="true" />
+                    {paid ? 'LUNAS' : 'QRIS diterima, menunggu tunai'}</span> :
+                    busy ? phase : message || (configured !== true ? configurationMessage : 'Menunggu pembayaran')}
+            </div>
+            {(onManualConfirm || rows.length > 0 || candidates.length > 0 || diagnostic) && <button type="button"
+                className="bca-detail-toggle" disabled={busy || disabled} onClick={() => detailDialog.current?.showModal()}>
+                <List size={16} aria-hidden="true" />
+                {candidates.length > 1 ? 'Pilih pembayaran (' + candidates.length + ')' : 'Detail pembayaran'}
+            </button>}
+            <dialog ref={detailDialog} className="bca-detail-dialog" aria-labelledby="bca-detail-title">
+                <header><h3 id="bca-detail-title">Detail pembayaran</h3>
+                    <button type="button" className="qris-screen-back" aria-label="Tutup detail" title="Tutup detail"
+                        onClick={() => detailDialog.current?.close()}><X size={20} aria-hidden="true" /></button>
+                </header>
+                {candidates.length > 1 && <div className="bca-mutasi-candidates">
+                    <p>Pilih RRN sesuai bukti pembayaran pelanggan:</p>
+                    {candidates.map(row => <button type="button" className="btn btn-secondary"
+                        disabled={busy || disabled} key={row.date + ':' + row.rrn}
+                        onClick={() => { detailDialog.current?.close(); void check('match', row.rrn); }}>
+                        {row.rrn} · {formatRupiah(row.amount)}
+                    </button>)}
+                </div>}
+                {rows.length > 0 && <table className="bca-mutasi-table">
+                    <thead><tr><th scope="col">RRN</th><th scope="col">Jumlah</th></tr></thead>
+                    <tbody>{rows.map(row => <tr key={row.date + ':' + row.rrn}><td>{row.rrn}</td><td>{formatRupiah(row.amount)}</td></tr>)}</tbody>
+                </table>}
+                {diagnostic && <p className="bca-detail-diagnostic">{diagnostic}</p>}
+                {onManualConfirm && !intent.verification && <button type="button" className="btn btn-secondary"
+                    disabled={busy || disabled || !ready || cashReceived < remainingCash}
+                    onClick={() => { detailDialog.current?.close(); onManualConfirm(); }}>
+                    Konfirmasi Manual &amp; Simpan
+                </button>}
+                {checkedAt && <small>Diperbarui {new Date(checkedAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</small>}
+            </dialog>
+        </section>
+    );
     return (
         <section className="bca-mutasi-panel" aria-label="Mutasi BCA" aria-busy={busy}>
             <div className="bca-mutasi-heading">
@@ -199,3 +247,4 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         </section>
     );
 }
+

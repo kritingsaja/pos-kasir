@@ -4452,6 +4452,127 @@ dialog[open].lp-modal-dialog {
   .qris-panel { padding: 18px; }
 }
 
+/* QR checkout owns the visual viewport so its payment action never scrolls away. */
+.qris-checkout-screen {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 1200;
+  height: 100vh;
+  height: 100dvh;
+  --qris-screen-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f7f8;
+  color: #182529;
+  letter-spacing: 0;
+}
+.qris-screen-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-height: 60px;
+  padding: 8px 20px;
+  border-bottom: 1px solid #dfe5e7;
+  background: #fff;
+}
+.qris-screen-header h2 { font-size: 18px; letter-spacing: 0; margin: 0; }
+.qris-screen-header > span { margin-left: auto; font-size: 13px; text-align: right; }
+.qris-screen-back {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #dfe5e7;
+  border-radius: 6px;
+  color: #182529;
+  background: #fff;
+  cursor: pointer;
+}
+.qris-screen-back:disabled { opacity: 0.4; cursor: default; }
+.qris-screen-content {
+  --qris-content-height: calc(var(--qris-screen-height) - 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 24px;
+}
+.qris-checkout-screen .qris-panel--compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 1 360px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.qris-panel--compact .qris-card-heading { justify-content: center; margin: 0 0 8px; }
+.qris-panel--compact .qris-wordmark { font-size: 22px; letter-spacing: 0; color: #182529; }
+.qris-panel--compact .qris-scan-amount { order: 1; margin: 0 0 12px; }
+.qris-panel--compact .qris-scan-amount span { font-size: 12px; color: #53646b; }
+.qris-panel--compact .qris-scan-amount strong { font-size: 30px; line-height: 1.2; color: #182529; letter-spacing: 0; }
+.qris-checkout-screen .qris-image-wrap {
+  order: 2;
+  flex-shrink: 0;
+  width: 340px;
+  width: min(340px, calc(var(--qris-content-height) - 120px));
+  max-width: 100%;
+  border-radius: 4px;
+  box-shadow: none;
+}
+.qris-screen-cash { width: 260px; min-width: 0; display: grid; gap: 10px; }
+.qris-screen-cash label, .qris-screen-cash > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; }
+.qris-screen-cash input { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #bcc9ce; border-radius: 6px; background: #fff; color: #182529; font-size: 16px; }
+.qris-screen-footer {
+  flex-shrink: 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #dfe5e7;
+  background: #fff;
+}
+.qris-screen-footer > * { max-width: 520px; margin-left: auto; margin-right: auto; }
+.qris-screen-footer .btn { width: 100%; min-height: 48px; border-radius: 6px; font-size: 15px; justify-content: center; white-space: normal; }
+.qris-screen-footer .btn-primary { background: #14765e; border-color: #14765e; color: #fff; }
+.qris-screen-footer .btn-primary:hover { background: #105c49; }
+.qris-screen-footer .qris-save-button { display: flex; margin-top: 8px; }
+.bca-payment-status { text-align: center; margin-top: 8px; font-size: 12px; line-height: 1.5; color: #53646b; overflow-wrap: anywhere; max-height: 54px; overflow-y: auto; }
+.bca-paid { display: inline-flex; align-items: center; gap: 6px; color: #14765e; font-weight: 700; }
+.bca-detail-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 6px auto 0; padding: 4px 8px; min-height: 32px; border: 0; border-radius: 4px; background: transparent; color: #32546a; font-size: 12px; cursor: pointer; }
+.bca-detail-dialog { position: fixed; inset: 0; margin: auto; width: min(480px, calc(100% - 32px)); max-height: 75vh; padding: 20px; border: 1px solid #dfe5e7; border-radius: 8px; background: #fff; color: #182529; overflow: auto; }
+.bca-detail-dialog::backdrop { background: rgba(20, 35, 40, 0.45); }
+.bca-detail-dialog > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.bca-detail-dialog h3 { font-size: 17px; letter-spacing: 0; }
+.bca-detail-dialog > small { display: block; margin-top: 12px; color: #53646b; }
+.bca-detail-diagnostic { overflow-wrap: anywhere; font-size: 12px; margin-top: 12px; }
+.qris-checkout-screen button:focus-visible, .bca-detail-dialog button:focus-visible { outline: 3px solid #57abcf; outline-offset: 2px; }
+@media (max-width: 600px) {
+  .qris-screen-header { padding: 8px 12px; gap: 8px; }
+  .qris-screen-header h2 { font-size: 16px; }
+  .qris-screen-header > span { max-width: 110px; font-size: 11px; }
+  .qris-screen-content { padding: 12px 20px; gap: 16px; }
+  .qris-screen-content--split { flex-direction: column; gap: 12px; }
+  .qris-screen-content--split .qris-panel--compact { flex: 0 1 auto; }
+  .qris-screen-content--split .qris-image-wrap { width: min(260px, calc(var(--qris-content-height) - 240px)); }
+  .qris-screen-cash { width: 100%; max-width: 340px; gap: 6px; }
+  .qris-screen-footer { padding-left: 16px; padding-right: 16px; }
+}
+.qris-checkout-screen--short .qris-screen-header { min-height: 48px; padding-top: 4px; padding-bottom: 4px; }
+.qris-checkout-screen--short .qris-card-heading { display: none; }
+.qris-checkout-screen--short .qris-scan-amount { margin-bottom: 6px; }
+.qris-checkout-screen--short .qris-scan-amount strong { font-size: 24px; }
+.qris-checkout-screen--short .qris-screen-content { padding-top: 8px; padding-bottom: 8px; gap: 16px; }
+.qris-checkout-screen--short .qris-screen-content--split { flex-direction: row; }
+.qris-checkout-screen--short .qris-screen-content--split .qris-panel--compact { flex: 1; }
+.qris-checkout-screen--short .qris-screen-content--split .qris-screen-cash { flex: 1; max-width: 240px; }
+.qris-checkout-screen--short .qris-image-wrap { width: min(220px, calc(var(--qris-content-height) - 70px)); }
+.qris-checkout-screen--short .qris-screen-footer { padding-top: 8px; padding-bottom: 8px; }
+
 .product-card.unavailable {
   opacity: 0.58;
   filter: grayscale(0.55);
@@ -4552,3 +4673,4 @@ dialog[open].lp-modal-dialog {
     grid-template-columns: 1fr 1fr;
   }
 }
+

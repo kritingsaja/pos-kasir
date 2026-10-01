@@ -6,8 +6,7 @@ import Receipt from '@/components/Receipt';
 import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
-import QrisPaymentPanel from '@/components/QrisPaymentPanel';
-import BcaMutasiPanel from '@/components/BcaMutasiPanel';
+import QrisCheckoutScreen from '@/components/QrisCheckoutScreen';
 import type { QrisPaymentIntent, BcaVerification } from '@/lib/bca-payment';
 import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
 import { ArrowLeft, Banknote, Check, QrCode } from 'lucide-react';
@@ -27,6 +26,7 @@ export default function KasirPage() {
     const [bcaChecking, setBcaChecking] = useState(false);
     const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
     const checkoutLock = useRef(false);
+    const autoCheckoutAttempt = useRef<string | null>(null);
     const bcaWarmupStarted = useRef(false);
     const [metodeBayar, setMetodeBayar] = useState<PaymentMethod>('tunai');
     const [showQrisPaymentPage, setShowQrisPaymentPage] = useState(false);
@@ -420,6 +420,8 @@ export default function KasirPage() {
     }
 
     function clearCart() {
+        setShowQrisPaymentPage(false);
+        autoCheckoutAttempt.current = null;
         setCart([]);
         setBayar(null);
         setQrisAmount(0);
@@ -524,9 +526,7 @@ export default function KasirPage() {
         setQrisIntent(current => current?.checkoutId === verification.checkoutId &&
             current.amount === verification.amount && current.timestamp === verification.timestamp
             ? { ...current, verification } : current);
-        const cashComplete = qrisRemaining === 0 || qrisCashAmount >= qrisRemaining;
-        if (cashComplete) void handleCheckout('qris', undefined, verification);
-    }, [qrisCashAmount, qrisRemaining]);
+    }, []);
 
     function showToast(message: string, type: string = 'success') {
         setToast({ message, type });
@@ -662,13 +662,13 @@ export default function KasirPage() {
         }
     }
 
-    async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number, forcedVerification?: BcaVerification) {
-        if (checkoutLock.current || (bcaChecking && !forcedVerification)) return;
+    async function handleCheckout(method: PaymentMethod = metodeBayar, forcedBayar?: number) {
+        if (checkoutLock.current || bcaChecking) return;
         if (cart.length === 0) {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
-        const qrisVerification = forcedVerification ?? activeQrisIntent?.verification;
+        const qrisVerification = activeQrisIntent?.verification;
         const qrisPayload = settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD;
         if (method === 'qris') {
             if (!Number.isSafeInteger(activeQrisAmount) || activeQrisAmount < 1 || activeQrisAmount > Math.min(total, QRIS_MAX_TRANSACTION_AMOUNT)) {
@@ -768,6 +768,15 @@ export default function KasirPage() {
             setIsCheckoutSubmitting(false);
         }
     }
+
+    // Wait for the BCA request to finish before saving the current verified checkout.
+    useEffect(() => {
+        if (step !== 'payment' || metodeBayar !== 'qris' || !activeQrisIntent?.verification ||
+            !qrisReady || bcaChecking || isCheckoutSubmitting || !isOnline ||
+            qrisCashAmount < qrisRemaining || autoCheckoutAttempt.current === activeQrisIntent.checkoutId) return;
+        autoCheckoutAttempt.current = activeQrisIntent.checkoutId;
+        void handleCheckout('qris');
+    });
 
     const quickCashAmounts = getQuickCashAmounts(total);
     const filteredDailyMenuProducts = products.filter((product) => {
@@ -1447,82 +1456,33 @@ export default function KasirPage() {
                                 )}
 
                             </div>
-                            {metodeBayar === 'qris' && <QrisPaymentPanel
-                                staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
-                                amount={activeQrisAmount}
-                                onReady={setQrisReady}
-                            />}
-                            {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
-                                key={activeQrisIntent.checkoutId}
-                                intent={activeQrisIntent}
-                                ready={qrisReady}
-                                remainingCash={qrisRemaining}
-                                cashReceived={qrisCashAmount}
-                                onVerified={handleBcaVerified}
-                                onBusyChange={setBcaChecking}
-                            />}
                         </div>}
-                        {showQrisPaymentPage && (
-                            <div className="qris-payment-page" style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', padding: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                                    <div>
-                                        <strong style={{ display: 'block', fontSize: '18px' }}>Scan QRIS pelanggan</strong>
-                                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Total {formatRupiah(total)}</span>
-                                    </div>
-                                    <button type="button" className="btn btn-secondary btn-sm" disabled={isCheckoutSubmitting || bcaChecking || !!activeQrisIntent?.verification} onClick={() => setShowQrisPaymentPage(false)}>
-                                        Ubah pembayaran
-                                    </button>
-                                </div>
-                                {metodeBayar === 'qris' && activeQrisIntent && <BcaMutasiPanel
-                                    key={activeQrisIntent.checkoutId}
-                                    intent={activeQrisIntent}
-                                    ready={qrisReady}
-                                    remainingCash={qrisRemaining}
-                                    cashReceived={qrisCashAmount}
-                                    onVerified={handleBcaVerified}
-                                    onBusyChange={setBcaChecking}
-                                />}
-                                <QrisPaymentPanel
-                                    staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
-                                    amount={activeQrisAmount}
-                                    onReady={setQrisReady}
-                                />
-                                <div className="checkout-breakdown">
-                                    <div><span>Via QRIS</span><strong>{formatRupiah(activeQrisAmount)}</strong></div>
-                                    <div><span>Sisa tunai</span><strong>{formatRupiah(qrisRemaining)}</strong></div>
-                                </div>
-                                {qrisRemaining > 0 && (
-                                    <div className="qris-cash-remainder">
-                                        <label htmlFor="qris-cash-received-page">Tunai untuk sisa tagihan</label>
-                                        <input
-                                            id="qris-cash-received-page"
-                                            type="number"
-                                            min={qrisRemaining}
-                                            value={qrisCashReceived ?? ''}
-                                            placeholder={String(qrisRemaining)}
-                                            onChange={(event) => setQrisCashReceived(event.target.value === '' ? null : (Number.parseInt(event.target.value, 10) || 0))}
-                                            inputMode="numeric"
-                                        />
-                                        <small>Minimal {formatRupiah(qrisRemaining)}.</small>
-                                    </div>
-                                )}
-                                {qrisRemaining > 0 && activeQrisIntent?.verification && (
-                                    <button type="button" className="btn btn-success btn-lg" disabled={isCheckoutSubmitting || bcaChecking || qrisCashAmount < qrisRemaining} onClick={() => void handleCheckout('qris')}>
-                                        <Check size={18} aria-hidden="true" /> Simpan Pembayaran
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                        {showQrisPaymentPage && <QrisCheckoutScreen
+                            staticPayload={settings.qris_static_payload || DEFAULT_QRIS_STATIC_PAYLOAD}
+                            amount={activeQrisAmount}
+                            total={total}
+                            intent={activeQrisIntent}
+                            ready={qrisReady}
+                            busy={bcaChecking}
+                            saving={isCheckoutSubmitting}
+                            cashReceived={qrisCashReceived}
+                            onCashChange={setQrisCashReceived}
+                            onReady={setQrisReady}
+                            onVerified={handleBcaVerified}
+                            onBusyChange={setBcaChecking}
+                            onBack={() => setShowQrisPaymentPage(false)}
+                            onSave={() => void handleCheckout('qris')}
+                        />}
                         {!showQrisPaymentPage && <div className="checkout-footer" style={{ bottom: `${keyboardHeight}px`, transition: 'bottom 0.2s ease' }}>
                             <button
                                 className="btn btn-success btn-lg"
-                                onClick={() => void handleCheckout(metodeBayar)}
-                                disabled={isCheckoutSubmitting || bcaChecking || (metodeBayar === 'qris' && !qrisReady)}
+                                onClick={() => metodeBayar === 'qris' ? setShowQrisPaymentPage(true) : void handleCheckout('tunai')}
+                                disabled={isCheckoutSubmitting || bcaChecking}
                                 aria-busy={isCheckoutSubmitting}
                             >
                                 <Check size={18} aria-hidden="true" />
                                 {isCheckoutSubmitting ? 'Menyimpan...' : (metodeBayar === 'qris'
-                                    ? (activeQrisIntent?.verification ? 'Simpan Pembayaran' : 'Konfirmasi Manual & Simpan') : 'Bayar & Simpan')}
+                                    ? 'Tampilkan QRIS' : 'Bayar & Simpan')}
                             </button>
                             <button className="btn btn-secondary" onClick={handleSaveDraft}>
                                 💾 Simpan Draft
@@ -1930,3 +1890,4 @@ export default function KasirPage() {
         </>
     );
 }
+
