@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, Check, LoaderCircle } from 'lucide-react';
 import QrisPaymentPanel from './QrisPaymentPanel';
 import BcaMutasiPanel from './BcaMutasiPanel';
+import BcaConnectionIndicator from './BcaConnectionIndicator';
 import type { BcaVerification, QrisPaymentIntent } from '@/lib/bca-payment';
 import { formatRupiah } from '@/lib/utils';
 
@@ -73,7 +74,10 @@ export default function QrisCheckoutScreen(props: Props) {
                     <ArrowLeft size={20} aria-hidden="true" />
                 </button>
                 <h2>Pembayaran QRIS</h2>
-                {remaining > 0 && <span>Tagihan {formatRupiah(total)}</span>}
+                <div className="qris-screen-connection">
+                    <BcaConnectionIndicator />
+                    {remaining > 0 && <span>Tagihan {formatRupiah(total)}</span>}
+                </div>
             </header>
             <div ref={content} className={remaining > 0 ? 'qris-screen-content qris-screen-content--split' : 'qris-screen-content'}>
                 <QrisPaymentPanel compact staticPayload={staticPayload} amount={amount} onReady={onReady} />

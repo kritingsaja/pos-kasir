@@ -229,6 +229,7 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
     const sessionCookies = await readBcaSession(db, sessionCacheKey);
     const rows = await scrapeBcaPayments({
       instant: payment?.instant ?? Date.now(), expectedNmid: nmid,
+      warmupOnly,
       sessionCookies,
       onSessionUpdate: cookies => saveBcaSession(db, sessionCacheKey, cookies),
       onProgress,
@@ -237,8 +238,9 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
     const latest = [...rows].sort((a, b) => b.minuteStart - a.minuteStart).slice(0, 10)
       .map(({ rrn, amount }) => ({ rrn, amount }));
     const checkedAt = new Date().toISOString();
-    if (warmupOnly) return { success: true, warmed: true, checkedAt };
-    if (listOnly) return { success: true, data: latest, checkedAt };
+    const connectionCheckedAt = checkedAt;
+    if (warmupOnly) return { success: true, warmed: true, checkedAt, connectionCheckedAt };
+    if (listOnly) return { success: true, data: latest, checkedAt, connectionCheckedAt };
 
     const bankDates = [...new Set(rows.map(row => row.date))];
     const used = bankDates.length ? await db.execute({
@@ -250,12 +252,12 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
     const candidates = payment.rrn ? eligible.filter(row => row.rrn === payment.rrn) : eligible;
     if (candidates.length === 0) {
       return { success: true, matched: false, checkoutId: payment.checkoutId,
-        message: 'Pembayaran belum ditemukan', transactions: latest, checkedAt };
+        message: 'Pembayaran belum ditemukan', transactions: latest, checkedAt, connectionCheckedAt };
     }
     if (candidates.length > 1) {
       return { success: true, matched: false, ambiguous: true, checkoutId: payment.checkoutId,
         message: 'Ada beberapa pembayaran yang cocok. Pilih RRN dari bukti pelanggan.',
-        candidates: candidates.map(publicTransaction), transactions: latest, checkedAt };
+        candidates: candidates.map(publicTransaction), transactions: latest, checkedAt, connectionCheckedAt };
     }
     const transaction = publicTransaction(candidates[0]);
     // Both checkout identity and bank reference are unique in persistent storage.
@@ -268,7 +270,7 @@ export async function checkMutasiBca({ input, cookie, fetchSite, onProgress = ()
     });
     const saved = await readClaim(db, payment.checkoutId);
     if (!saved) throw new BcaError('PAYMENT_ALREADY_USED', 'RRN sudah digunakan oleh pesanan lain.', 409);
-    return resultFromClaim(saved, payment, ownerId, nmid);
+    return { ...resultFromClaim(saved, payment, ownerId, nmid), connectionCheckedAt };
   } finally {
     // If storage is unavailable the finite lease prevents a permanent lock.
     await release().catch(() => {});
@@ -287,3 +289,4 @@ export const noCacheHeaders = {
   'CDN-Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
 };
+

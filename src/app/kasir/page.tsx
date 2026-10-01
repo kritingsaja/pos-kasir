@@ -7,6 +7,8 @@ import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 import QrisCheckoutScreen from '@/components/QrisCheckoutScreen';
+import BcaConnectionIndicator from '@/components/BcaConnectionIndicator';
+import { warmBcaConnection } from '@/lib/bca-connection';
 import type { QrisPaymentIntent, BcaVerification } from '@/lib/bca-payment';
 import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
 import { ArrowLeft, Banknote, Check, QrCode } from 'lucide-react';
@@ -161,16 +163,7 @@ export default function KasirPage() {
     useEffect(() => {
         if (bcaWarmupStarted.current) return;
         bcaWarmupStarted.current = true;
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 115_000);
-        void fetch('/api/cek-mutasi-bca', {
-            method: 'POST',
-            credentials: 'same-origin',
-            cache: 'no-store',
-            signal: controller.signal,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'warmup' }),
-        }).catch(() => {}).finally(() => window.clearTimeout(timer));
+        void warmBcaConnection();
         // Warm the BCA session in the background; it must not block the cashier UI.
     }, []);
 
@@ -840,7 +833,8 @@ export default function KasirPage() {
                     <>
                         {/* ── LEFT: Product Grid ── */}
                         <div className={`pos-products ${isTablet ? 'tablet-products-col' : ''}`}>
-                            <div className="products-header">
+                            <div className="products-header products-header--bca">
+                                <BcaConnectionIndicator />
                                 <div className="search-bar" style={{ flex: 1 }}>
                                     <span className="search-icon">🔍</span>
                                     <input

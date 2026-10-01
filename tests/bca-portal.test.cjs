@@ -165,6 +165,7 @@ function browserFixture({ restoreCookies = false, navigationFailure = false } = 
     });
     const browser = {
       connected: true,
+      expireSession: () => { loggedIn = false; },
       newPage: async () => { metrics.pages++; return page; },
       setCookie: async () => { loggedIn = restoreCookies; },
       close: async () => { metrics.closes++; browser.connected = false; },
@@ -190,6 +191,9 @@ test('full scrape: one login, same tab on second request, new browser after disc
   assert.equal(metrics.submits, 1);
   assert.equal(metrics.launches, 1);
   assert.equal(metrics.pages, 1);
+  assert.deepEqual(metrics.visits.slice(-1), ['/home']);
+  assert.equal(metrics.visits.filter(path => path === '/menu').length, 1);
+  assert.equal(metrics.visits.filter(path => path === '/home').length, 2);
   browsers[0].connected = false;
   await check();
   assert.equal(metrics.launches, 2);
@@ -206,6 +210,34 @@ test('restored cookie session skips login; expired cookie session uses the exist
   }
 });
 
+test('cashier warmup verifies merchant without reading mutations; next check loads fresh home', async () => {
+  const { metrics, check } = browserFixture();
+  assert.equal((await check({ warmupOnly: true })).length, 0);
+  assert.equal(metrics.visits.includes('/home'), false);
+  assert.equal(metrics.submits, 1);
+  assert.equal((await check()).length, 1);
+  assert.equal(metrics.visits.filter(path => path === '/home').length, 1);
+  assert.equal(metrics.visits.filter(path => path === '/menu').length, 1);
+  assert.equal(metrics.submits, 1);
+});
+
+test('warmup cannot report success for the wrong merchant', async () => {
+  const { check, metrics } = browserFixture();
+  await assert.rejects(check({ warmupOnly: true, expectedNmid: 'ID9999999999999' }), error => error.code === 'WRONG_MERCHANT');
+  assert.equal(metrics.visits.includes('/home'), false);
+  assert.equal(metrics.closes, 1);
+});
+
+test('expired reused browser cannot verify old rows and is discarded for the next login', async () => {
+  const { check, browsers, metrics } = browserFixture();
+  await check({ warmupOnly: true });
+  browsers[0].expireSession();
+  await assert.rejects(check(), error => error.code === 'BCA_SESSION_EXPIRED');
+  assert.equal(metrics.closes, 1);
+  assert.equal((await check()).length, 1);
+  assert.equal(metrics.submits, 2);
+});
+
 test('failure to restore due to network never submits credentials, and discards unhealthy browser', async () => {
   const { metrics, check } = browserFixture({ navigationFailure: true });
   await assert.rejects(check({ sessionCookies: [{ name: 'fixture', value: 'fixture' }] }), error => error.code === 'BCA_NAVIGATION_TIMEOUT');
@@ -214,3 +246,4 @@ test('failure to restore due to network never submits credentials, and discards 
   assert.ok(metrics.visits.every(path => path === '/menu'));
   assert.equal(metrics.closes, 1);
 });
+

@@ -10,10 +10,11 @@ const SESSION_MAX_AGE_MS = 8 * 60 * 60_000;
 let reusableBrowser;
 let reusablePage;
 let reusableAccount;
+let reusableMerchant;
 let reusableUntil = 0;
 let reusableBrowserIdleTimer;
 
-export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), sessionCookies = null, onSessionUpdate = async () => {}, onProgress = () => {} }) {
+export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesToRead(instant), warmupOnly = false, sessionCookies = null, onSessionUpdate = async () => {}, onProgress = () => {} }) {
   const { BCA_USER, BCA_PASS } = process.env;
   if (!BCA_USER || !BCA_PASS) throw new BcaError('BCA_CONFIG', 'BCA_USER dan BCA_PASS belum disiapkan.', 503);
   let browser;
@@ -49,6 +50,7 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
       if (reusableBrowser) await closeBrowser(reusableBrowser);
       reusableBrowser = undefined;
       reusablePage = undefined;
+      reusableMerchant = undefined;
       browser = await puppeteer.launch({
         args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
         executablePath: await chromium.executablePath(),
@@ -74,60 +76,73 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     await page.emulateTimezone('Asia/Jakarta');
     const hasCookies = Array.isArray(sessionCookies) && sessionCookies.length > 0;
     if (!browserReused && hasCookies) await browser.setCookie(...sessionCookies);
-    progress(browserReused || hasCookies ? 'restoring_session' : 'opening_login');
-    // A network failure is not evidence of an expired login. Only a rendered login form triggers login.
-    const entry = await openPortal(page, browserReused || hasCookies ? '/menu' : '/login', 'entry', { limit, report });
-    const sessionRestored = entry.kind === 'merchant';
+    let merchant;
+    if (browserReused && reusableMerchant && !warmupOnly) {
+      // Same account/NMID and authenticated browser. Still reload /home for fresh bank data below.
+      merchant = reusableMerchant;
+      authenticated = true;
+      progress('reusing_session');
+    } else {
+      progress(browserReused || hasCookies ? 'restoring_session' : 'opening_login');
+      // A network failure is not evidence of an expired login. Only a rendered login form triggers login.
+      const entry = await openPortal(page, browserReused || hasCookies ? '/menu' : '/login', 'entry', { limit, report });
+      const sessionRestored = entry.kind === 'merchant';
 
-    if (!sessionRestored) {
-      progress('logging_in');
-      await page.locator(LOGIN_EMAIL).fill(BCA_USER.trim());
-      await page.locator(LOGIN_PASSWORD).fill(BCA_PASS);
-      const buttons = await page.$$('button');
-      const loginButton = await findByText(buttons, 'Masuk');
-      if (!loginButton) throw new BcaError('PORTAL_CHANGED', 'Tombol login QRMS berubah.');
-      await loginButton.click();
-      progress('waiting_login_result');
-      try {
-        await waitForPortal(page, 'signed_in', limit(25_000));
-      } catch (error) {
-        if (error instanceof BcaError) throw error;
-        throw new BcaError('BCA_LOGIN_FAILED', 'Login QRMS gagal atau memerlukan verifikasi. Periksa akun secara manual.', 502);
+      if (!sessionRestored) {
+        progress('logging_in');
+        await page.locator(LOGIN_EMAIL).fill(BCA_USER.trim());
+        await page.locator(LOGIN_PASSWORD).fill(BCA_PASS);
+        const buttons = await page.$$('button');
+        const loginButton = await findByText(buttons, 'Masuk');
+        if (!loginButton) throw new BcaError('PORTAL_CHANGED', 'Tombol login QRMS berubah.');
+        await loginButton.click();
+        progress('waiting_login_result');
+        try {
+          await waitForPortal(page, 'signed_in', limit(25_000));
+        } catch (error) {
+          if (error instanceof BcaError) throw error;
+          throw new BcaError('BCA_LOGIN_FAILED', 'Login QRMS gagal atau memerlukan verifikasi. Periksa akun secara manual.', 502);
+        }
+        progress('reading_merchant');
+        await openPortal(page, '/menu', 'merchant', { limit, report });
       }
-      progress('reading_merchant');
-      await openPortal(page, '/menu', 'merchant', { limit, report });
-    }
 
-    // MID is obtained from the signed-in profile, rather than an environment variable.
-    progress('reading_merchant');
-    const merchant = await page.evaluate(() => {
-      const fields = Array.from(document.querySelectorAll('p')).map(p => p.innerText.trim());
-      return {
-        mid: fields.map(text => text.match(/^MID:\s*(\d+)$/)?.[1]).find(Boolean),
-        nmid: fields.map(text => text.match(/^NMID:\s*(ID\d{13})$/)?.[1]).find(Boolean),
-      };
-    });
-    if (!merchant.mid || merchant.nmid !== expectedNmid) {
-      throw new BcaError('WRONG_MERCHANT', 'Merchant pada akun BCA berbeda dari QRIS di Pengaturan.', 409);
+      // MID is obtained from the signed-in profile, rather than an environment variable.
+      progress('reading_merchant');
+      merchant = await page.evaluate(() => {
+        const fields = Array.from(document.querySelectorAll('p')).map(p => p.innerText.trim());
+        return {
+          mid: fields.map(text => text.match(/^MID:\s*(\d+)$/)?.[1]).find(Boolean),
+          nmid: fields.map(text => text.match(/^NMID:\s*(ID\d{13})$/)?.[1]).find(Boolean),
+        };
+      });
+      if (!merchant.mid || merchant.nmid !== expectedNmid) {
+        throw new BcaError('WRONG_MERCHANT', 'Merchant pada akun BCA berbeda dari QRIS di Pengaturan.', 409);
+      }
+      authenticated = true;
+      reusableMerchant = merchant;
+      // Reuse the authenticated session next time, but only after verifying the expected merchant.
+      const sessionStored = await onSessionUpdate(await page.cookies(ORIGIN).then(cookies => cookies.map(cookie => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        ...(cookie.expires > 0 ? { expires: cookie.expires } : {}),
+        httpOnly: cookie.httpOnly,
+        secure: cookie.secure,
+        ...(cookie.sameSite ? { sameSite: cookie.sameSite } : {}),
+        ...(cookie.priority ? { priority: cookie.priority } : {}),
+        ...(cookie.sourceScheme ? { sourceScheme: cookie.sourceScheme } : {}),
+        ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
+      }))));
+      const storageCounts = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }));
+      console.info(JSON.stringify({ event: 'bca.session', browserReused, sessionRestored,
+        stored: sessionStored === true, storageCounts }));
     }
-    authenticated = true;
-    // Reuse the authenticated session next time, but only after verifying the expected merchant.
-    const sessionStored = await onSessionUpdate(await page.cookies(ORIGIN).then(cookies => cookies.map(cookie => ({
-      name: cookie.name,
-      value: cookie.value,
-      domain: cookie.domain,
-      path: cookie.path,
-      ...(cookie.expires > 0 ? { expires: cookie.expires } : {}),
-      httpOnly: cookie.httpOnly,
-      secure: cookie.secure,
-      ...(cookie.sameSite ? { sameSite: cookie.sameSite } : {}),
-      ...(cookie.priority ? { priority: cookie.priority } : {}),
-      ...(cookie.sourceScheme ? { sourceScheme: cookie.sourceScheme } : {}),
-      ...(cookie.partitionKey ? { partitionKey: cookie.partitionKey } : {}),
-    }))));
-    const storageCounts = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }));
-    console.info(JSON.stringify({ event: 'bca.session', browserReused, sessionRestored,
-      stored: sessionStored === true, storageCounts }));
+    if (warmupOnly) {
+      progress('connection_ready');
+      return [];
+    }
     progress('opening_transactions');
     const initialDataRevision = bankData.revision;
     const transactionScreen = await openPortal(page, `/home?mid=${encodeURIComponent(merchant.mid)}`, 'calendar', { limit, report });
@@ -218,12 +233,12 @@ export async function scrapeBcaPayments({ instant, expectedNmid, dates = datesTo
     if (authenticated && browser && browser === reusableBrowser && browser.connected && page && !page.isClosed()) {
       clearTimeout(reusableBrowserIdleTimer);
       reusableBrowserIdleTimer = setTimeout(() => {
-        if (reusableBrowser === browser) { reusableBrowser = undefined; reusablePage = undefined; }
+        if (reusableBrowser === browser) { reusableBrowser = undefined; reusablePage = undefined; reusableMerchant = undefined; }
         void closeBrowser(browser);
       }, Math.max(0, Math.min(BROWSER_IDLE_TIMEOUT_MS, reusableUntil - Date.now())));
       reusableBrowserIdleTimer.unref?.();
     } else if (browser) {
-      if (reusableBrowser === browser) { reusableBrowser = undefined; reusablePage = undefined; }
+      if (reusableBrowser === browser) { reusableBrowser = undefined; reusablePage = undefined; reusableMerchant = undefined; }
       await closeBrowser(browser);
     }
   }
@@ -259,3 +274,4 @@ async function findByText(elements, text) {
   }
   return undefined;
 }
+

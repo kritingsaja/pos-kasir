@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, LoaderCircle, List, X } from 'lucide-react';
+import { CheckCircle2, LoaderCircle, List, X, ExternalLink, ClipboardCheck } from 'lucide-react';
 import type { BcaVerification, QrisPaymentIntent } from '@/lib/bca-payment';
 import { formatRupiah } from '@/lib/utils';
+import { bcaChecking, bcaConnected, bcaFailed, waitForBcaWarmup } from '@/lib/bca-connection';
 
 interface BankRow { rrn: string; amount: number; date?: string }
 interface CheckResult {
@@ -14,6 +15,7 @@ interface CheckResult {
     candidates?: BankRow[];
     transactions?: BankRow[];
     checkedAt?: string;
+    connectionCheckedAt?: string;
     message?: string;
     error?: string;
     code?: string;
@@ -74,6 +76,16 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     const pending = useRef<AbortController | null>(null);
     const mounted = useRef(false);
     const detailDialog = useRef<HTMLDialogElement>(null);
+    const manualDialog = useRef<HTMLDialogElement>(null);
+    const [manualConfirmed, setManualConfirmed] = useState(false);
+    const [elapsed, setElapsed] = useState(0);
+
+    useEffect(() => {
+        if (!busy) return;
+        const started = Date.now();
+        const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+        return () => window.clearInterval(timer);
+    }, [busy]);
 
     useEffect(() => {
         mounted.current = true;
@@ -107,7 +119,8 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         if (mode === 'match' && !ready) { setMessage('Tunggu sampai QRIS selesai dibuat.'); return; }
         const controller = new AbortController();
         pending.current = controller;
-        const timer = setTimeout(() => controller.abort(), 125_000);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        setElapsed(0);
         setBusy(true);
         onBusyChange(true);
         setMessage('');
@@ -116,13 +129,13 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
         setRows([]);
         setCheckedAt('');
         try {
-            setPhase('Memeriksa koneksi…');
-            const configuration = await readConfiguration(controller);
+            setPhase('Menunggu koneksi awal BCA...');
+            // Do not compete with the cashier's warmup for the merchant lock.
+            await waitForBcaWarmup();
             if (!mounted.current) return;
-            if (controller.signal.aborted) throw new Error('Pengecekan koneksi melewati batas waktu. Coba lagi.');
-            setConfigured(configuration.configured === true);
-            setConfigurationMessage(configuration.configured ? '' : configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
-            if (!configuration.configured) throw new Error(configuration.message || 'Pengecekan BCA belum diaktifkan untuk aplikasi ini.');
+            if (controller.signal.aborted) return;
+            timer = setTimeout(() => controller.abort(), 125_000);
+            bcaChecking();
             setPhase('Memuat dan mencocokkan mutasi BCA…');
             const response = await fetch('/api/cek-mutasi-bca', {
                 method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
@@ -139,6 +152,8 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 setDiagnostic([result.code, result.stage, result.requestId].filter(Boolean).join(' · '));
                 throw new Error(result.error || 'Pengecekan BCA gagal.');
             }
+            bcaConnected(result.connectionCheckedAt);
+            setConfigured(true);
             setCheckedAt(result.checkedAt ?? '');
             if (mode === 'list') {
                 const list = Array.isArray(result.data) ? result.data : [];
@@ -158,6 +173,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 setMessage(result.message ?? 'Pembayaran belum ditemukan.');
             }
         } catch (error) {
+            bcaFailed();
             if (mounted.current) setMessage(error instanceof Error && error.name !== 'AbortError'
                 ? error.message : 'Pengecekan belum selesai. Periksa koneksi, lalu tekan cek lagi untuk pesanan ini.');
         } finally {
@@ -170,17 +186,23 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     const paid = Boolean(intent.verification) && cashReceived >= remainingCash;
     if (compact) return (
         <section className="bca-payment-actions" aria-label="Status pembayaran" aria-busy={busy}>
+            <div className="bca-payment-buttons">
             {!intent.verification && <button type="button" className="btn btn-primary bca-check-button"
                 disabled={busy || disabled || !ready} onClick={() => void check('match')}>
                 {busy ? <LoaderCircle size={18} className="bca-loading-icon" aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
-                {busy ? 'Memeriksa pembayaran...' : 'Cek Pembayaran'}
+                {busy ? 'Mengecek ' + elapsed + ' dtk' : 'Cek Pembayaran'}
             </button>}
+            {onManualConfirm && !intent.verification && <button type="button" className="btn btn-secondary bca-manual-button"
+                disabled={disabled} onClick={() => { setManualConfirmed(false); manualDialog.current?.showModal(); }}>
+                <ClipboardCheck size={18} aria-hidden="true" />Cek Manual
+            </button>}
+            </div>
             <div className="bca-payment-status" role="status" aria-live="polite">
                 {intent.verification ? <span className="bca-paid"><CheckCircle2 size={16} aria-hidden="true" />
                     {paid ? 'LUNAS' : 'QRIS diterima, menunggu tunai'}</span> :
                     busy ? phase : message || (configured !== true ? configurationMessage : 'Menunggu pembayaran')}
             </div>
-            {(onManualConfirm || rows.length > 0 || candidates.length > 0 || diagnostic) && <button type="button"
+            {(rows.length > 0 || candidates.length > 0 || diagnostic) && <button type="button"
                 className="bca-detail-toggle" disabled={busy || disabled} onClick={() => detailDialog.current?.showModal()}>
                 <List size={16} aria-hidden="true" />
                 {candidates.length > 1 ? 'Pilih pembayaran (' + candidates.length + ')' : 'Detail pembayaran'}
@@ -203,12 +225,27 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                     <tbody>{rows.map(row => <tr key={row.date + ':' + row.rrn}><td>{row.rrn}</td><td>{formatRupiah(row.amount)}</td></tr>)}</tbody>
                 </table>}
                 {diagnostic && <p className="bca-detail-diagnostic">{diagnostic}</p>}
-                {onManualConfirm && !intent.verification && <button type="button" className="btn btn-secondary"
-                    disabled={busy || disabled || !ready || cashReceived < remainingCash}
-                    onClick={() => { detailDialog.current?.close(); onManualConfirm(); }}>
-                    Konfirmasi Manual &amp; Simpan
-                </button>}
                 {checkedAt && <small>Diperbarui {new Date(checkedAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</small>}
+            </dialog>
+            <dialog ref={manualDialog} className="bca-detail-dialog bca-manual-dialog" aria-labelledby="bca-manual-title">
+                <header><h3 id="bca-manual-title">Cek pembayaran manual</h3>
+                    <button type="button" className="qris-screen-back" aria-label="Tutup cek manual" title="Tutup cek manual"
+                        onClick={() => manualDialog.current?.close()}><X size={20} aria-hidden="true" /></button>
+                </header>
+                <p className="bca-manual-amount">QRIS <strong>{formatRupiah(intent.amount)}</strong></p>
+                <a className="btn btn-secondary" href="https://qr.klikbca.com/login" target="_blank" rel="noopener noreferrer">
+                    <ExternalLink size={18} aria-hidden="true" />Buka portal BCA
+                </a>
+                <label className="bca-manual-confirm"><input type="checkbox" checked={manualConfirmed}
+                    onChange={event => setManualConfirmed(event.target.checked)} />
+                    Pembayaran sudah masuk di BCA dan belum digunakan untuk pesanan lain.
+                </label>
+                {busy && <p role="status">Pengecekan otomatis masih berjalan.</p>}
+                {cashReceived < remainingCash && <p>Sisa tunai belum cukup.</p>}
+                <button type="button" className="btn btn-primary" disabled={!manualConfirmed || busy || disabled || !ready || cashReceived < remainingCash || Boolean(intent.verification)}
+                    onClick={() => { manualDialog.current?.close(); onManualConfirm?.(); }}>
+                    Konfirmasi Manual &amp; Simpan
+                </button>
             </dialog>
         </section>
     );

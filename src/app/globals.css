@@ -4543,6 +4543,28 @@ dialog[open].lp-modal-dialog {
 .qris-screen-footer .qris-save-button { display: flex; margin-top: 8px; }
 .bca-payment-status { text-align: center; margin-top: 8px; font-size: 12px; line-height: 1.5; color: #53646b; overflow-wrap: anywhere; max-height: 54px; overflow-y: auto; }
 .bca-paid { display: inline-flex; align-items: center; gap: 6px; color: #14765e; font-weight: 700; }
+.bca-payment-buttons { display: flex; align-items: stretch; gap: 8px; }
+.bca-payment-buttons .bca-check-button { flex: 1; min-width: 0; }
+.bca-payment-buttons .bca-manual-button { width: auto; flex: 0 0 auto; font-size: 13px; padding: 10px 12px; box-shadow: none; }
+.bca-connection { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.3; color: #53646b; letter-spacing: 0; }
+.bca-connection-led { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; background: #89969b; }
+.bca-connection--connected .bca-connection-led { background: #16805d; }
+.bca-connection--checking .bca-connection-led { background: #c68a16; }
+.bca-connection--error .bca-connection-led, .bca-connection--offline .bca-connection-led { background: #c33c46; }
+.qris-screen-connection { margin-left: auto; display: grid; gap: 3px; text-align: right; justify-items: end; flex: 0 0 auto; max-width: 135px; }
+.qris-screen-connection > span:not(.bca-connection) { font-size: 11px; }
+.qris-screen-header h2 { min-width: 0; }
+.products-header > .bca-connection { flex: 0 0 auto; }
+.pos-products .products-header--bca { flex-wrap: wrap; align-items: center; }
+.bca-manual-amount { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.bca-manual-confirm { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0; font-size: 13px; line-height: 1.5; }
+.bca-manual-confirm input { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 2px; accent-color: #14765e; }
+.bca-manual-dialog > p[role="status"] { margin: 12px 0; font-size: 12px; color: #53646b; }
+@media (max-width: 600px) {
+  .products-header > .bca-connection { flex-basis: 100%; margin: 8px 16px 0; }
+  .qris-screen-connection { max-width: 112px; }
+  .bca-payment-buttons .btn { font-size: 12px; padding-left: 8px; padding-right: 8px; }
+}
 .bca-detail-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 6px auto 0; padding: 4px 8px; min-height: 32px; border: 0; border-radius: 4px; background: transparent; color: #32546a; font-size: 12px; cursor: pointer; }
 .bca-detail-dialog { position: fixed; inset: 0; margin: auto; width: min(480px, calc(100% - 32px)); max-height: 75vh; padding: 20px; border: 1px solid #dfe5e7; border-radius: 8px; background: #fff; color: #182529; overflow: auto; }
 .bca-detail-dialog::backdrop { background: rgba(20, 35, 40, 0.45); }
