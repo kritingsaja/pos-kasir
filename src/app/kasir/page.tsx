@@ -1527,7 +1527,7 @@ export default function KasirPage() {
                             <button className="btn btn-secondary" onClick={handleSaveDraft}>
                                 💾 Simpan Draft
                             </button>
-                        </div>
+                        </div>}
                     </div>
                 )}
             </div>
