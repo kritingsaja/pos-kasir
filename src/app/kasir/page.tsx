@@ -7,7 +7,6 @@ import ClosingSummary from '@/components/ClosingSummary';
 import { useOfflineSync } from '@/lib/useOfflineSync';
 import { getCashReceived, getQuickCashAmounts } from '@/lib/cash-payment';
 import QrisCheckoutScreen from '@/components/QrisCheckoutScreen';
-import BcaConnectionIndicator from '@/components/BcaConnectionIndicator';
 import { warmBcaConnection } from '@/lib/bca-connection';
 import type { QrisPaymentIntent, BcaVerification } from '@/lib/bca-payment';
 import { DEFAULT_QRIS_STATIC_PAYLOAD, QRIS_MAX_TRANSACTION_AMOUNT, convertStaticQrisToDynamic } from '@/lib/qris';
@@ -833,8 +832,7 @@ export default function KasirPage() {
                     <>
                         {/* ── LEFT: Product Grid ── */}
                         <div className={`pos-products ${isTablet ? 'tablet-products-col' : ''}`}>
-                            <div className="products-header products-header--bca">
-                                <BcaConnectionIndicator />
+                            <div className="products-header">
                                 <div className="search-bar" style={{ flex: 1 }}>
                                     <span className="search-icon">🔍</span>
                                     <input

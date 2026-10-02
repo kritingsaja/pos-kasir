@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { KeyRound } from 'lucide-react';
+import BcaConnectionIndicator from '@/components/BcaConnectionIndicator';
 
 const navItems = [
     { href: '/', icon: '📊', label: 'Dashboard', access: ['Admin'] },
@@ -100,6 +101,12 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
                     {isCollapsed ? '☰' : '✕'}
                 </button>
             </div>
+
+            {shouldShowKasirActions && (
+                <div className={`sidebar-bca-connection ${isCollapsed ? 'collapsed' : ''}`}>
+                    <BcaConnectionIndicator compact={isCollapsed} />
+                </div>
+            )}
 
             <nav className="sidebar-nav" style={{ flex: 1 }}>
                 {allowedItems.map((item) => (
