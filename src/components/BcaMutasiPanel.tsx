@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, LoaderCircle, List, X, ExternalLink, ClipboardCheck } from 'lucide-react';
+import { CheckCircle2, LoaderCircle, List, X, ClipboardCheck } from 'lucide-react';
 import type { BcaVerification, QrisPaymentIntent } from '@/lib/bca-payment';
 import { formatRupiah } from '@/lib/utils';
 import { bcaChecking, bcaConnected, bcaFailed, waitForBcaWarmup } from '@/lib/bca-connection';
@@ -76,8 +76,6 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
     const pending = useRef<AbortController | null>(null);
     const mounted = useRef(false);
     const detailDialog = useRef<HTMLDialogElement>(null);
-    const manualDialog = useRef<HTMLDialogElement>(null);
-    const [manualConfirmed, setManualConfirmed] = useState(false);
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
@@ -193,7 +191,7 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 {busy ? 'Mengecek ' + elapsed + ' dtk' : 'Cek Pembayaran'}
             </button>}
             {onManualConfirm && !intent.verification && <button type="button" className="btn btn-secondary bca-manual-button"
-                disabled={disabled} onClick={() => { setManualConfirmed(false); manualDialog.current?.showModal(); }}>
+                disabled={busy || disabled || !ready || cashReceived < remainingCash} onClick={onManualConfirm}>
                 <ClipboardCheck size={18} aria-hidden="true" />Cek Manual
             </button>}
             </div>
@@ -226,26 +224,6 @@ export default function BcaMutasiPanel({ intent, ready, remainingCash, cashRecei
                 </table>}
                 {diagnostic && <p className="bca-detail-diagnostic">{diagnostic}</p>}
                 {checkedAt && <small>Diperbarui {new Date(checkedAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</small>}
-            </dialog>
-            <dialog ref={manualDialog} className="bca-detail-dialog bca-manual-dialog" aria-labelledby="bca-manual-title">
-                <header><h3 id="bca-manual-title">Cek pembayaran manual</h3>
-                    <button type="button" className="qris-screen-back" aria-label="Tutup cek manual" title="Tutup cek manual"
-                        onClick={() => manualDialog.current?.close()}><X size={20} aria-hidden="true" /></button>
-                </header>
-                <p className="bca-manual-amount">QRIS <strong>{formatRupiah(intent.amount)}</strong></p>
-                <a className="btn btn-secondary" href="https://qr.klikbca.com/login" target="_blank" rel="noopener noreferrer">
-                    <ExternalLink size={18} aria-hidden="true" />Buka portal BCA
-                </a>
-                <label className="bca-manual-confirm"><input type="checkbox" checked={manualConfirmed}
-                    onChange={event => setManualConfirmed(event.target.checked)} />
-                    Pembayaran sudah masuk di BCA dan belum digunakan untuk pesanan lain.
-                </label>
-                {busy && <p role="status">Pengecekan otomatis masih berjalan.</p>}
-                {cashReceived < remainingCash && <p>Sisa tunai belum cukup.</p>}
-                <button type="button" className="btn btn-primary" disabled={!manualConfirmed || busy || disabled || !ready || cashReceived < remainingCash || Boolean(intent.verification)}
-                    onClick={() => { manualDialog.current?.close(); onManualConfirm?.(); }}>
-                    Konfirmasi Manual &amp; Simpan
-                </button>
             </dialog>
         </section>
     );
