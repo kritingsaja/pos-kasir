@@ -29,7 +29,7 @@ export interface PrintReceiptData {
   tanggal?: string;
   waktu?: string;
   kasir?: string;
-  items: Array<{ nama_barang: string; qty: number; harga_jual: number; subtotal: number; catatan?: string }>;
+  items: Array<{ nama_barang: string; qty: number; harga_jual: number; harga_override?: number; subtotal: number; catatan?: string }>;
   subtotal: number;
   diskonTotal: number;
   total: number;
@@ -236,7 +236,7 @@ export class BluetoothPrinter {
         if (item.catatan) {
           bytes.push(...line(`  * Note: ${item.catatan}`));
         }
-        bytes.push(...line(`  ${item.qty} x ${item.harga_jual} = ${item.subtotal}`));
+        bytes.push(...line(`  ${item.qty} x ${item.harga_override ?? item.harga_jual} = ${item.subtotal}`));
       }
       bytes.push(...separator());
 
@@ -323,4 +323,5 @@ export class BluetoothPrinter {
 }
 
 export const printer = new BluetoothPrinter();
+
 
