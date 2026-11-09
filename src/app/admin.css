@@ -69,3 +69,42 @@
 @media (max-width: 1150px) { .admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }.admin-columns { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 768px) { .admin-header { padding-left: 52px; }.admin-header h1 { font-size: 23px; }.admin-metric { padding: 14px; }.admin-metric strong { font-size: 20px; }.admin-shortcuts { grid-template-columns: 1fr; }.admin-shortcuts a { padding: 12px 4px; }.admin-shortcuts a + a { border-top: 1px solid var(--border-soft); }.admin-metrics { gap: 10px; }.admin-tabs { gap: 18px; }.admin-key-form label { flex: 1; }.admin-key-form .admin-button { width: 100%; } }
 @media (max-width: 380px) { .admin-metric strong { font-size: 17px; }.admin-metric > div { font-size: 12px; }.admin-actions input[type=date] { width: 156px; } }
+
+
+/* Shared layout for legacy admin screens; cashier pages keep their existing layout. */
+.main-content:has(.admin-legacy-page) { background: var(--bg-base); }
+.admin-legacy-page {
+  width: 100%; max-width: 1500px; min-height: 100%; margin: 0 auto;
+  padding: 24px clamp(16px, 2.4vw, 36px); color: var(--text-900); font-size: 14px;
+}
+.admin-legacy-page *, .admin-legacy-page h1, .admin-legacy-page h2 { letter-spacing: 0; }
+.admin-legacy-page .admin-page-header, .admin-legacy-page .page-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  min-height: 88px; margin: 0 0 20px; padding: 18px 22px;
+  background: #fff; border: 1px solid var(--border-soft); border-radius: 12px;
+}
+.admin-legacy-page .admin-page-header h1, .admin-legacy-page .page-header h1 { margin: 0; font-size: 24px; line-height: 1.25; }
+.admin-legacy-page .admin-page-header p, .admin-legacy-page .page-header p { margin: 6px 0 0; color: var(--text-500); font-size: 13px; }
+.admin-legacy-page .card {
+  min-width: 0; background: #fff; border: 1px solid var(--border-soft); border-radius: 12px;
+  box-shadow: 0 1px 3px rgb(30 41 35 / 4%);
+}
+.admin-legacy-page .card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.admin-legacy-page .card-header h2 { margin: 0; font-size: 16px; line-height: 1.4; }
+.admin-legacy-page input:not([type=checkbox]), .admin-legacy-page select, .admin-legacy-page textarea {
+  max-width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px;
+}
+.admin-legacy-page input:focus-visible, .admin-legacy-page select:focus-visible, .admin-legacy-page textarea:focus-visible,
+.admin-legacy-page button:focus-visible, .admin-legacy-page a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.admin-legacy-page .table-container, .admin-legacy-page .table-responsive { max-width: 100%; overflow-x: auto; }
+.admin-legacy-page table { width: 100%; }
+.admin-legacy-page .admin-settings-content { width: 100%; max-width: 1120px; margin: 0 auto; }
+.admin-legacy-page .admin-category-content { width: 100%; max-width: 1000px; margin: 0 auto; }
+.admin-legacy-page .admin-inventory-title { font-size: 24px !important; line-height: 1.25; }
+@media (max-width: 768px) {
+  .admin-legacy-page { padding: 16px 12px 24px; }
+  .admin-legacy-page .admin-page-header, .admin-legacy-page .page-header { min-height: 0; padding: 16px; gap: 12px; }
+  .admin-legacy-page .admin-page-header h1, .admin-legacy-page .page-header h1 { font-size: 21px; }
+  .admin-legacy-page .card { border-radius: 10px; }
+  .admin-legacy-page .admin-settings-content, .admin-legacy-page .admin-category-content { max-width: none; }
+}
