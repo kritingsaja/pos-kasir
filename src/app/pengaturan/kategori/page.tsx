@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import '../../admin.css';
 
 export default function CategoryPage() {
     const [categories, setCategories] = useState<Array<{ id: number; nama: string }>>([]);
@@ -73,8 +74,8 @@ export default function CategoryPage() {
     }
 
     return (
-        <>
-            <div className="page-header">
+        <div className="admin-legacy-page">
+            <div className="admin-page-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Link href="/pengaturan" className="btn btn-sm btn-secondary">← Kembali</Link>
                     <h1>Manajemen Kategori</h1>
@@ -82,7 +83,8 @@ export default function CategoryPage() {
                 <p className="subtitle">Kelola kategori produk untuk mempermudah pencarian di kasir.</p>
             </div>
 
-            <div className="card" style={{ maxWidth: '600px', marginBottom: '24px' }}>
+            <div className="admin-category-content">
+            <div className="card" style={{ marginBottom: '24px' }}>
                 <div className="card-header">
                     <h2>Tambah Kategori Baru</h2>
                 </div>
@@ -98,7 +100,7 @@ export default function CategoryPage() {
                 </div>
             </div>
 
-            <div className="card" style={{ maxWidth: '600px' }}>
+            <div className="card">
                 <div className="card-header">
                     <h2>Daftar Kategori</h2>
                 </div>
@@ -158,6 +160,7 @@ export default function CategoryPage() {
                     </div>
                 )}
             </div>
-        </>
+        </div>
+        </div>
     );
 }
