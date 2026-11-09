@@ -198,10 +198,10 @@ export async function findPlatformAccount(username: string): Promise<BusinessAcc
     return (result.rows[0] as unknown as BusinessAccount) || null;
 }
 
-export async function getBusinessDatabase(id: string) {
+export async function getBusinessDatabase(id: string, allowSuspended = false) {
     const result = await getPlatformDb().execute({ sql: 'SELECT id,status,database_url,database_token_encrypted FROM platform_businesses WHERE id=? LIMIT 1', args: [id] });
     const row = result.rows[0] as Record<string, unknown> | undefined;
-    if (!row || row.status !== 'active') throw new Error('Bisnis tidak aktif atau tidak ditemukan.');
+    if (!row || (row.status !== 'active' && !allowSuspended)) throw new Error('Bisnis tidak aktif atau tidak ditemukan.');
     let db = tenantClients.get(id);
     if (!db) {
         db = createClient({ url: String(row.database_url), authToken: decryptDatabaseToken(String(row.database_token_encrypted)) });
