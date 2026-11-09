@@ -83,6 +83,7 @@
   min-height: 88px; margin: 0 0 20px; padding: 18px 22px;
   background: #fff; border: 1px solid var(--border-soft); border-radius: 12px;
 }
+.admin-legacy-page .admin-page-header > div { width: 100%; }
 .admin-legacy-page .admin-page-header h1, .admin-legacy-page .page-header h1 { margin: 0; font-size: 24px; line-height: 1.25; }
 .admin-legacy-page .admin-page-header p, .admin-legacy-page .page-header p { margin: 6px 0 0; color: var(--text-500); font-size: 13px; }
 .admin-legacy-page .card {
