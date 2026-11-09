@@ -56,7 +56,7 @@ export default function LoginPage() {
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
                     <h1 style={{ margin: 0, color: 'var(--text-primary)' }}>KasirPOS</h1>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke akun {storeName}</p>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke aplikasi kasir</p>
                 </div>
 
                 {error && (
