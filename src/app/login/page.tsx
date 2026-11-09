@@ -26,7 +26,9 @@ export default function LoginPage() {
 
             if (res.ok && data.success) {
                 // Redirect based on role
-                if (data.data.role === 'Kasir') {
+                if (data.data.role === 'Superadmin') {
+                    router.push('/superadmin');
+                } else if (data.data.role === 'Kasir') {
                     router.push('/kasir');
                 } else {
                     router.push('/');

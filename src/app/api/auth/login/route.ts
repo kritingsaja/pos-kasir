@@ -2,18 +2,46 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserByUsername, ensureDb } from '@/lib/db';
 import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
+import { timingSafeEqual } from 'node:crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_pos_kasir_app';
 
+function secretMatches(input: string, expected: string) {
+    const a = Buffer.from(input);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
     try {
-        await ensureDb();
         const { username, password } = await req.json();
 
         if (!username || !password) {
             return NextResponse.json({ success: false, error: 'Username dan password harus diisi' }, { status: 400 });
         }
 
+        const superUsername = process.env.SUPERADMIN_USERNAME;
+        const superPassword = process.env.SUPERADMIN_PASSWORD;
+        const superJwtSecret = process.env.JWT_SECRET;
+        if (superUsername && superPassword && superJwtSecret && superJwtSecret.length >= 32 &&
+            secretMatches(String(username), superUsername) && secretMatches(String(password), superPassword)) {
+            const jwt = await new SignJWT({ username: superUsername, role: 'Superadmin', scope: 'platform' })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('4h')
+                .sign(new TextEncoder().encode(superJwtSecret));
+            const response = NextResponse.json({ success: true, data: { username: superUsername, role: 'Superadmin' } });
+            response.cookies.set('token', jwt, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 60 * 60 * 4,
+                path: '/',
+            });
+            return response;
+        }
+
+        await ensureDb();
         const user = (await getUserByUsername(username)) as any;
 
         if (!user || !user.password) {
