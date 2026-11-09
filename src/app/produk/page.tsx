@@ -14,6 +14,7 @@ export default function ProdukPage() {
         kode_barang: '',
         nama_barang: '',
         harga_jual: 0,
+        harga_beli: 0,
         diskon: 0,
         tipe_diskon: 1,
         kategori: '',
@@ -69,6 +70,7 @@ export default function ProdukPage() {
             kode_barang: '',
             nama_barang: '',
             harga_jual: 0,
+            harga_beli: 0,
             diskon: 0,
             tipe_diskon: 1,
             kategori: '',
@@ -83,6 +85,7 @@ export default function ProdukPage() {
             kode_barang: product.kode_barang,
             nama_barang: product.nama_barang,
             harga_jual: product.harga_jual,
+            harga_beli: product.harga_beli || 0,
             diskon: product.diskon,
             tipe_diskon: product.tipe_diskon,
             kategori: product.kategori,
@@ -188,6 +191,7 @@ export default function ProdukPage() {
                                         <th>Nama Barang</th>
                                         <th>Kategori</th>
                                         <th>Harga Jual</th>
+                                        <th>Harga Modal</th>
                                         <th>Diskon</th>
                                         <th>Stok</th>
                                         <th>Aksi</th>
@@ -206,6 +210,7 @@ export default function ProdukPage() {
                                                     : <span style={{ color: 'var(--text-300)', fontSize: '12px' }}>—</span>}
                                             </td>
                                             <td style={{ fontWeight: 600 }}>{formatRupiah(product.harga_jual)}</td>
+                                            <td style={{ fontWeight: 600 }}>{formatRupiah(product.harga_beli || 0)}</td>
                                             <td>
                                                 {product.diskon > 0
                                                     ? product.tipe_diskon === 1
@@ -339,6 +344,10 @@ export default function ProdukPage() {
                                         onChange={(e) => setFormData({ ...formData, harga_jual: parseInt(e.target.value) || 0 })}
                                         required
                                     />
+                                </div>
+                                <div className="input-group">
+                                    <label>Harga Beli / Modal (Rp)</label>
+                                    <input type="number" min="0" value={formData.harga_beli} onChange={(e) => setFormData({ ...formData, harga_beli: parseInt(e.target.value) || 0 })} />
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                     <div className="input-group">

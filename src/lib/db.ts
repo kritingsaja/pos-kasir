@@ -43,6 +43,7 @@ export async function initializeDatabase() {
         kode_barang TEXT UNIQUE NOT NULL,
         nama_barang TEXT NOT NULL,
         harga_jual INTEGER NOT NULL DEFAULT 0,
+        harga_beli INTEGER NOT NULL DEFAULT 0,
         diskon INTEGER NOT NULL DEFAULT 0,
         tipe_diskon INTEGER NOT NULL DEFAULT 1,
         kategori TEXT DEFAULT '',
@@ -119,6 +120,10 @@ export async function initializeDatabase() {
     ];
 
     await db.batch(schema.map(sql => ({ sql, args: [] })));
+    const productColumns = await db.execute('PRAGMA table_info(products)');
+    if (!productColumns.rows.some((column) => String((column as Record<string, unknown>).name) === 'harga_beli')) {
+      await db.execute('ALTER TABLE products ADD COLUMN harga_beli INTEGER NOT NULL DEFAULT 0');
+    }
     const transactionColumns = await db.execute('PRAGMA table_info(transactions)');
     if (!transactionColumns.rows.some((column) => String((column as Record<string, unknown>).name) === 'rincian_bayar')) {
       await db.execute("ALTER TABLE transactions ADD COLUMN rincian_bayar TEXT NOT NULL DEFAULT ''");
@@ -259,12 +264,13 @@ export async function getProductByKode(kode: string) {
 export async function addProduct(product: any) {
   const db = getDb();
   return await db.execute({
-    sql: `INSERT INTO products (kode_barang, nama_barang, harga_jual, diskon, tipe_diskon, kategori, stok)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO products (kode_barang, nama_barang, harga_jual, harga_beli, diskon, tipe_diskon, kategori, stok)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       product.kode_barang,
       product.nama_barang,
       product.harga_jual,
+      product.harga_beli || 0,
       product.diskon || 0,
       product.tipe_diskon || 1,
       product.kategori || '',
