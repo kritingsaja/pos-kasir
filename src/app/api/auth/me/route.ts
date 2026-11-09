@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
                 id: payload.id,
                 username: payload.username,
                 role: payload.role,
+                businessId: payload.businessId,
+                businessName: payload.businessName,
             }
         });
     } catch (error) {

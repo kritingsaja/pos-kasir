@@ -1,5 +1,6 @@
 import { createClient, Client } from '@libsql/client';
 import path from 'path';
+import { headers } from 'next/headers';
 
 const isProd = process.env.NODE_ENV === 'production';
 const url = process.env.TURSO_URL || process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL;
@@ -12,16 +13,35 @@ const finalUrl = url || `file:${path.join(process.cwd(), 'data', 'pos.db')}`;
 const authToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
 
 let client: Client | null = null;
+let requestClient: Client | null = null;
 let initialized = false;
 
+function getDefaultDb(): Client {
+  if (!client) client = createClient({ url: finalUrl, authToken });
+  return client;
+}
+
+async function getRequestDb(): Promise<Client> {
+  let businessId: string | null = null;
+  try { businessId = (await headers()).get('x-business-id'); } catch { return getDefaultDb(); }
+  if (!businessId) return getDefaultDb();
+  const { getBusinessDatabase } = await import('@/lib/platform-db');
+  return getBusinessDatabase(businessId);
+}
+
 export function getDb(): Client {
-  if (!client) {
-    client = createClient({
-      url: finalUrl,
-      authToken: authToken,
+  if (!requestClient) {
+    requestClient = new Proxy({} as Client, {
+      get(_target, property) {
+        if (property === 'then') return undefined;
+        return (...args: unknown[]) => getRequestDb().then((db) => {
+          const member = (db as unknown as Record<PropertyKey, unknown>)[property];
+          return typeof member === 'function' ? Reflect.apply(member, db, args) : member;
+        });
+      },
     });
   }
-  return client;
+  return requestClient;
 }
 
 export async function ensureDb() {
@@ -31,9 +51,12 @@ export async function ensureDb() {
   }
 }
 
-export async function initializeDatabase() {
-  const db = getDb();
-  console.log("Initializing database schema on:", finalUrl);
+export async function initializeDatabase(
+  targetDb: Client = getDb(),
+  options: { seedUsers?: boolean; throwOnError?: boolean; databaseUrl?: string; businessType?: 'cafe' | 'stockist' } = {}
+) {
+  const db = targetDb;
+  console.log("Initializing database schema on:", options.databaseUrl || finalUrl);
   
   try {
     // 1. Create Tables
@@ -137,23 +160,25 @@ export async function initializeDatabase() {
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['telepon_toko', '08123456789'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['footer_nota', 'Terima Kasih atas Kunjungan Anda!'] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['auto_print_bluetooth', 'true'] },
-      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['qris_static_payload', '00020101021126650013ID.CO.BCA.WWW011893600014000101195202150008850010119520303UMI51440014ID.CO.QRIS.WWW0215ID10200471870560303UMI5204581453033605802ID5911T3A.CO CAFE6006KENDAL61055137262070703A0163045194'] },
+      { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['qris_static_payload', ''] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_date', ''] },
       { sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', args: ['daily_unavailable_menu_codes', '[]'] }
     ]);
 
     // 3. Default Users
-    const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
-    await db.batch([
-      { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['admin', defaultPassword, 'Admin'] },
-      { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['kasir', defaultPassword, 'Kasir'] }
-    ]);
+    if (options.seedUsers !== false) {
+      const defaultPassword = '$2b$10$khdhhXUoPcA1fv1t8zKmAe4mXTEyguJw7DTZZ/M7QDEybnSzUjTH.';
+      await db.batch([
+        { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['admin', defaultPassword, 'Admin'] },
+        { sql: 'INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', args: ['kasir', defaultPassword, 'Kasir'] }
+      ]);
+    }
 
     // 4. Default Categories
     try {
       const countRes = await db.execute('SELECT COUNT(*) as c FROM categories');
       if (Number((countRes.rows[0] as any).c) === 0) {
-        const cats = ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
+        const cats = options.businessType === 'stockist' ? ['Produk'] : ['Makanan', 'Minuman', 'Snack', 'Lain-lain'];
         await db.batch(cats.map(cat => ({ sql: 'INSERT INTO categories (nama) VALUES (?)', args: [cat] })));
       }
     } catch (e) { console.log("Category seed skipped or failed"); }
@@ -161,8 +186,8 @@ export async function initializeDatabase() {
     console.log("Database initialized.");
   } catch (error) {
     console.error("DATABASE FAIL:", error);
-    // Don't throw here, let the app try to continue if possible, 
-    // or it will throw on the first real query anyway.
+    if (options.throwOnError) throw error;
+    // Legacy initialization remains best-effort; the first application query will report failures.
   }
 }
 

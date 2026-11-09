@@ -84,6 +84,8 @@ export async function middleware(request: NextRequest) {
 
             // Add user info to headers for downstream access if needed
             const requestHeaders = new Headers(request.headers);
+            requestHeaders.delete('x-business-id');
+            if (typeof payload.businessId === 'string') requestHeaders.set('x-business-id', payload.businessId);
             requestHeaders.set('x-user-role', role);
             requestHeaders.set('x-user-username', payload.username as string);
 

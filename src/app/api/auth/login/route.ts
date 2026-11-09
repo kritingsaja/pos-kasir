@@ -3,6 +3,7 @@ import { getUserByUsername, ensureDb } from '@/lib/db';
 import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import { timingSafeEqual } from 'node:crypto';
+import { findPlatformAccount, getBusinessDatabase } from '@/lib/platform-db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_pos_kasir_app';
 
@@ -42,6 +43,34 @@ export async function POST(req: NextRequest) {
                 sameSite: 'strict',
                 maxAge: 60 * 60 * 4,
                 path: '/',
+            });
+            return response;
+        }
+
+        const account = await findPlatformAccount(String(username));
+        if (account) {
+            if (!account.active || account.business_status !== 'active') {
+                return NextResponse.json({ success: false, error: 'Akun bisnis sedang tidak aktif.' }, { status: 403 });
+            }
+            const passwordMatch = await bcrypt.compare(String(password), account.password_hash);
+            if (!passwordMatch) return NextResponse.json({ success: false, error: 'Password salah.' }, { status: 401 });
+
+            await getBusinessDatabase(account.business_id);
+            const jwt = await new SignJWT({
+                id: account.id, username: account.username, role: account.role,
+                businessId: account.business_id, businessName: account.business_name,
+            })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('24h')
+                .sign(new TextEncoder().encode(JWT_SECRET));
+            const response = NextResponse.json({
+                success: true,
+                data: { id: account.id, username: account.username, role: account.role, businessId: account.business_id, businessName: account.business_name },
+            });
+            response.cookies.set('token', jwt, {
+                httpOnly: true, secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict', maxAge: 60 * 60 * 24, path: '/',
             });
             return response;
         }
