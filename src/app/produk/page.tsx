@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Product, formatRupiah } from '@/lib/utils';
-import './admin.css';
+import '../admin.css';
 
 export default function ProdukPage() {
     const [products, setProducts] = useState<Product[]>([]);
