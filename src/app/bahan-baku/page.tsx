@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import './admin.css';
 
 interface Material {
   id: number;
@@ -133,9 +134,9 @@ export default function BahanBakuPage() {
   };
 
   return (
-    <div className="container" style={{ padding: '24px' }}>
-      <div className="header-container">
-        <h1 style={{ margin: 0 }}>📦 Manajemen Inventaris</h1>
+    <div className="admin-legacy-page admin-inventory">
+      <div className="header-container admin-page-header">
+        <h1 className="admin-inventory-title" style={{ margin: 0 }}>Manajemen Inventaris</h1>
         <div className="tab-group">
            <button 
              className={`tab-btn ${activeTab === 'materials' ? 'active' : ''}`}
