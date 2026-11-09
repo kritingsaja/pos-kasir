@@ -42,7 +42,7 @@
   .superadmin-business-table { min-width: 0; display: block; }
   .superadmin-business-table thead { display: none; }
   .superadmin-business-table tbody { display: grid; gap: 10px; padding: 10px; }
-  .superadmin-business-table tbody tr:not(:has(td[colspan])) {
+  .superadmin-business-table tbody tr:not(.superadmin-empty-row) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     min-width: 0;
@@ -71,7 +71,7 @@
   .superadmin-business-table tbody td:first-child,
   .superadmin-business-table tbody td[data-label="Aksi"] { grid-column: 1 / -1; }
   .superadmin-business-table tbody td[data-label="Aksi"] > div { gap: 7px !important; }
-  .superadmin-business-table tbody td[colspan] { display: block; padding: 20px 12px !important; }
+  .superadmin-business-table tbody .superadmin-empty-row td { display: block; padding: 20px 12px !important; }
   .superadmin-account-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .superadmin-account-form > strong { grid-column: 1 / -1; }
   .superadmin-account-form > label { min-width: 0; }
@@ -86,5 +86,5 @@
   .superadmin-account-form { grid-template-columns: minmax(0, 1fr); }
   .superadmin-account-form > strong,
   .superadmin-account-form > button { grid-column: auto; }
-  .superadmin-dashboard > .superadmin-container > section:nth-of-type(3) > div:first-child { align-items: flex-start !important; flex-wrap: wrap; }
+  .superadmin-business-panel > div:first-child { align-items: flex-start !important; flex-wrap: wrap; }
 }
