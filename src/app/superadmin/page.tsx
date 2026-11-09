@@ -9,6 +9,7 @@ type Business = {
     status: 'active' | 'suspended'; admin_username: string; cashier_count: number;
     database_name: string; created_at: string; health: 'connected' | 'error' | 'suspended' | 'unknown';
 };
+type ManagedAccount = { id: string; username: string; role: 'Admin' | 'Kasir'; active: number; created_at?: string };
 type Summary = { total: number; active: number; suspended: number; cafe: number; stockist: number };
 type Setup = { configured: boolean; provisioningConfigured: boolean; missing?: string[] };
 
@@ -25,6 +26,9 @@ export default function SuperadminDashboard() {
     const [showForm, setShowForm] = useState(false);
     const [lastCredential, setLastCredential] = useState<{ business: string; username: string; password: string } | null>(null);
     const [showPassword, setShowPassword] = useState(false);
+    const [managedBusiness, setManagedBusiness] = useState<Business | null>(null);
+    const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([]);
+    const [accountDrafts, setAccountDrafts] = useState<Record<string, { username: string; password: string }>>({});
     const [form, setForm] = useState({ name: '', slug: '', businessType: 'stockist', adminUsername: '', adminPassword: '' });
 
     const load = useCallback(async () => {
@@ -78,6 +82,38 @@ export default function SuperadminDashboard() {
         if (!response.ok || !body.success) { setError(body.error || 'Status bisnis gagal diperbarui.'); return; }
         setSuccess(status === 'suspended' ? 'Akses login bisnis dihentikan.' : 'Akses login bisnis diaktifkan kembali.');
         await load();
+    }
+
+    async function openAccountManager(business: Business) {
+        setManagedBusiness(business); setManagedAccounts([]); setAccountDrafts({}); setError('');
+        try {
+            const response = await fetch('/api/superadmin/businesses/' + encodeURIComponent(business.id) + '/accounts', { cache: 'no-store' });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Daftar akun gagal dimuat.');
+            setManagedAccounts(body.accounts || []);
+            setAccountDrafts(Object.fromEntries((body.accounts || []).map((account: ManagedAccount) => [account.id, { username: account.username, password: '' }])));
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Daftar akun gagal dimuat.');
+        }
+    }
+
+    async function saveAccount(account: ManagedAccount) {
+        const draft = accountDrafts[account.id];
+        if (!draft) return;
+        setSaving(true); setError(''); setSuccess('');
+        try {
+            const response = await fetch('/api/superadmin/businesses/' + encodeURIComponent(managedBusiness!.id) + '/accounts', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId: account.id, username: draft.username, password: draft.password }),
+            });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Reset akun gagal.');
+            setSuccess('Login ' + account.role + ' berhasil diperbarui. Sampaikan username dan password baru kepada pemilik akun.');
+            setAccountDrafts(current => ({ ...current, [account.id]: { username: draft.username, password: '' } }));
+            await openAccountManager(managedBusiness!);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Reset akun gagal.');
+        } finally { setSaving(false); }
     }
 
     async function logout() {
@@ -172,13 +208,30 @@ export default function SuperadminDashboard() {
                                     <td style={{ padding: '14px' }}><code>{business.database_name}</code></td>
                                     <td style={{ padding: '14px', color: business.health === 'connected' ? '#15803d' : business.health === 'error' ? '#b91c1c' : '#64748b' }}>{business.health === 'connected' ? 'Terhubung' : business.health === 'error' ? 'Bermasalah' : business.health === 'suspended' ? 'Ditangguhkan' : '—'}</td>
                                     <td style={{ padding: '14px' }}>{business.status === 'active' ? 'Aktif' : 'Ditangguhkan'}</td>
-                                    <td style={{ padding: '14px' }}><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></td>
+                                    <td style={{ padding: '14px' }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button onClick={() => void openAccountManager(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>Kelola akun</button><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></div></td>
                                 </tr>)}
                                 {!loading && !businesses.length && <tr><td colSpan={8} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>{setup.configured ? 'Belum ada akun bisnis. Buat akun bisnis pertama.' : 'Hubungkan database platform untuk memuat daftar bisnis.'}</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </section>
+                {managedBusiness && <div role="presentation" onClick={() => setManagedBusiness(null)} style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16, background: '#0f172a88' }}>
+                    <section role="dialog" aria-modal="true" aria-labelledby="business-accounts-title" onClick={event => event.stopPropagation()} style={{ width: 'min(100%, 760px)', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 14, background: '#fff', boxShadow: '0 20px 60px #0f172a44' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+                            <div><h2 id="business-accounts-title" style={{ margin: '0 0 4px' }}>Akun {managedBusiness.name}</h2><p style={{ margin: 0, color: '#64748b', fontSize: 13 }}>Atur ulang username dan password Admin atau Kasir. Password lama tidak dapat dilihat.</p></div>
+                            <button type="button" onClick={() => setManagedBusiness(null)} style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 11px', background: '#fff', cursor: 'pointer' }}>Tutup</button>
+                        </div>
+                        <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                            {managedAccounts.map(account => <form key={account.id} onSubmit={event => { event.preventDefault(); void saveAccount(account); }} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px,.6fr) repeat(2,minmax(150px,1fr)) auto', gap: 9, alignItems: 'end', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10 }}>
+                                <strong style={{ paddingBottom: 10 }}>{account.role}</strong>
+                                <label style={{ fontSize: 12, fontWeight: 700 }}>Username<input required minLength={3} maxLength={40} value={accountDrafts[account.id]?.username || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), username: event.target.value } }))} style={inputStyle} /></label>
+                                <label style={{ fontSize: 12, fontWeight: 700 }}>Password baru<input required type="password" minLength={10} maxLength={128} autoComplete="new-password" value={accountDrafts[account.id]?.password || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), password: event.target.value } }))} style={inputStyle} placeholder="Minimal 10 karakter" /></label>
+                                <button disabled={saving} style={{ border: 0, borderRadius: 8, padding: '11px 12px', color: '#fff', background: '#0f766e', fontWeight: 700, cursor: 'pointer' }}>{saving ? 'Menyimpan…' : 'Reset login'}</button>
+                            </form>)}
+                            {!managedAccounts.length && <p style={{ padding: 18, textAlign: 'center', color: '#64748b' }}>Tidak ada akun bisnis.</p>}
+                        </div>
+                    </section>
+                </div>}
                 <footer style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 14, color: '#64748b', fontSize: 12 }}><Users size={14} /> Superadmin hanya mengelola akun, status, dan koneksi database.</footer>
             </div>
         </main>
