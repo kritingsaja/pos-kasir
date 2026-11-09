@@ -13,7 +13,7 @@
 .superadmin-dashboard *,
 .superadmin-dashboard *::before,
 .superadmin-dashboard *::after { box-sizing: border-box; }
-.superadmin-container { width: min(100%, 1240px); min-width: 0; margin: 0 auto; }
+.superadmin-container { width: min(100%, 1320px); min-width: 0; margin: 0 auto; }
 .superadmin-dashboard header { min-width: 0; }
 .superadmin-dashboard header > div:first-child { min-width: 0; }
 .superadmin-dashboard header p { line-height: 1.5; }
