@@ -21,10 +21,15 @@ export async function POST(req: NextRequest) {
         }
 
         const superUsername = process.env.SUPERADMIN_USERNAME;
-        const superPassword = process.env.SUPERADMIN_PASSWORD;
-        const superJwtSecret = process.env.JWT_SECRET;
-        if (superUsername && superPassword && superJwtSecret && superJwtSecret.length >= 32 &&
-            secretMatches(String(username), superUsername) && secretMatches(String(password), superPassword)) {
+        if (superUsername && secretMatches(String(username), superUsername)) {
+            const superPassword = process.env.SUPERADMIN_PASSWORD;
+            const superJwtSecret = process.env.JWT_SECRET;
+            if (!superPassword || !superJwtSecret || superJwtSecret.length < 32) {
+                return NextResponse.json({ success: false, error: 'Kredensial Superadmin belum dikonfigurasi lengkap di Vercel.' }, { status: 503 });
+            }
+            if (!secretMatches(String(password), superPassword)) {
+                return NextResponse.json({ success: false, error: 'Password Superadmin salah.' }, { status: 401 });
+            }
             const jwt = await new SignJWT({ username: superUsername, role: 'Superadmin', scope: 'platform' })
                 .setProtectedHeader({ alg: 'HS256' })
                 .setIssuedAt()
