@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import './admin.css';
+import '../admin.css';
 
 interface Material {
   id: number;
