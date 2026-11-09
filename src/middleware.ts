@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
 
     // Reauthentication must work even when a previous cookie was signed with an old secret.
     // Login validates credentials in its route; logout only clears the session cookie.
-    if (path === '/api/auth/login' || path === '/api/auth/logout') return NextResponse.next();
+    if (path === '/api/auth/login' || path === '/api/auth/logout' || path === '/api/superadmin/login') return NextResponse.next();
 
     // External endpoints authenticate their own scoped Bearer keys.
     if (path === '/api/v1/menu' || path === '/api/v1/orders') return NextResponse.next();
@@ -24,12 +24,13 @@ export async function middleware(request: NextRequest) {
     // Root or login page should not be protected right here if the intent is to redirect
     // But actually let's just make it simple:
     const isLoginPage = path === '/login';
+    const isSuperadminLogin = path === '/superadmin/login';
     const isBosPage = path === '/bos' || path.startsWith('/api/bos');
     const isAuthApi = path.startsWith('/api/auth/');
     const isPublicAsset = !path.startsWith('/api/') &&
         (path.match(/\.(png|jpg|jpeg|gif|svg|ico|json|webmanifest)$/i) || path === '/manifest.ts');
 
-    if (!token && !isLoginPage && !isBosPage && !isAuthApi && !isPublicAsset) {
+    if (!token && !isLoginPage && !isSuperadminLogin && !isBosPage && !isAuthApi && !isPublicAsset) {
         if (path.startsWith('/api/')) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
@@ -43,8 +44,25 @@ export async function middleware(request: NextRequest) {
 
             const role = payload.role as string;
 
+            if (isSuperadminLogin) {
+                return NextResponse.redirect(new URL(role === 'Superadmin' ? '/superadmin' : role === 'Kasir' ? '/kasir' : '/', request.url));
+            }
+
+            if (role === 'Superadmin') {
+                if (path === '/superadmin/login') return NextResponse.redirect(new URL('/superadmin', request.url));
+                const allowed = path === '/superadmin' || path.startsWith('/superadmin/') || path.startsWith('/api/superadmin/') || path.startsWith('/api/auth/');
+                if (!allowed) {
+                    if (path.startsWith('/api/')) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+                    return NextResponse.redirect(new URL('/superadmin', request.url));
+                }
+                const requestHeaders = new Headers(request.headers);
+                requestHeaders.set('x-user-role', role);
+                requestHeaders.set('x-user-username', String(payload.username || ''));
+                return NextResponse.next({ request: { headers: requestHeaders } });
+            }
+
             if (isLoginPage) {
-                return NextResponse.redirect(new URL(role === 'Kasir' ? '/kasir' : '/', request.url));
+                return NextResponse.redirect(new URL(role === 'Superadmin' ? '/superadmin' : role === 'Kasir' ? '/kasir' : '/', request.url));
             }
 
             // Role-based Path protection
@@ -76,7 +94,7 @@ export async function middleware(request: NextRequest) {
             });
 
         } catch (error) {
-            if (isLoginPage) return NextResponse.next();
+            if (isLoginPage || isSuperadminLogin) return NextResponse.next();
 
             if (path.startsWith('/api/') && !path.startsWith('/api/auth/')) {
                 return NextResponse.json({ success: false, error: 'Invalid Token' }, { status: 401 });

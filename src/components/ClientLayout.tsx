@@ -24,7 +24,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const [username, setUsername] = useState<string | null>(null);
     const pathname = usePathname();
 
-    const isLoginPage = pathname === '/login';
+    const isLoginPage = pathname === '/login' || pathname.startsWith('/superadmin');
 
     const isSidebarCollapsed = isMobile ? !isSidebarOpenMobile : isSidebarCollapsedDesktop;
 
