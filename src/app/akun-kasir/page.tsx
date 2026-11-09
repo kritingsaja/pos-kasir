@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import '../admin.css';
 
 type Account = { id: string; username: string; role: 'Admin' | 'Kasir'; active: number; created_at?: string };
 
@@ -69,8 +70,8 @@ export default function AkunKasirPage() {
     }
 
     return (
-        <main style={{ maxWidth: 1000, margin: '0 auto', padding: '24px clamp(14px, 3vw, 30px)' }}>
-            <div className="page-header">
+        <div className="admin-legacy-page">
+            <div className="admin-page-header">
                 <h1>Akun Kasir</h1>
                 <p>Buat akun login Kasir untuk bisnis ini dan atur ulang username atau passwordnya.</p>
             </div>
@@ -118,6 +119,6 @@ export default function AkunKasirPage() {
                     </form>
                 </section>
             </div>}
-        </main>
+        </div>
     );
 }
