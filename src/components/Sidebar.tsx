@@ -14,6 +14,7 @@ const navItems = [
     { href: '/bahan-baku', icon: '🧪', label: 'Bahan Baku', access: ['Admin'] },
     { href: '/laporan', icon: '📋', label: 'Laporan', access: ['Admin'] },
     { href: '/akses-api', icon: <KeyRound size={19} />, label: 'Akses API', access: ['Admin'] },
+    { href: '/akun-kasir', icon: '👥', label: 'Akun Kasir', access: ['Admin'] },
     { href: '/pengaturan', icon: '⚙️', label: 'Pengaturan', access: ['Admin'] },
 ];
 
