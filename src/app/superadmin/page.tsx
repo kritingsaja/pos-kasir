@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { Building2, CircleAlert, Database, RefreshCw, ShieldCheck, Store, Users } from 'lucide-react';
+import './superadmin.css';
 
 type Business = {
     id: string; name: string; slug: string; business_type: 'cafe' | 'stockist';
@@ -124,11 +125,11 @@ export default function SuperadminDashboard() {
     const inputStyle: CSSProperties = { display: 'block', width: '100%', marginTop: 6, padding: '11px 12px', border: '1px solid #cbd5e1', borderRadius: 9, color: '#0f172a', background: '#fff' };
 
     return (
-        <main style={{ minHeight: '100vh', background: '#f4f7fb', padding: '28px clamp(14px, 4vw, 56px)', color: '#14202f' }}>
-            <div style={{ maxWidth: 1240, margin: '0 auto' }}>
+        <main className="superadmin-dashboard">
+            <div className="superadmin-container">
                 <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 20 }}>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: '#0f766e', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><ShieldCheck size={16} /> Platform KasirPOS</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--brand)', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><ShieldCheck size={16} /> Platform KasirPOS</div>
                         <h1 style={{ margin: '7px 0 3px', fontSize: 'clamp(25px, 4vw, 34px)', letterSpacing: '-.03em' }}>Dashboard Superadmin</h1>
                         <p style={{ margin: 0, color: '#64748b' }}>Kelola akun bisnis dan status database tanpa melihat data penjualan.</p>
                     </div>
@@ -160,10 +161,10 @@ export default function SuperadminDashboard() {
 
                 <section aria-label="Ringkasan akun bisnis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: 13, marginTop: 22 }}>
                     {[
-                        { label: 'Total bisnis', value: summary.total, icon: Building2, accent: '#0f766e' },
-                        { label: 'Aktif', value: summary.active, icon: ShieldCheck, accent: '#16a34a' },
-                        { label: 'Cafe', value: summary.cafe, icon: Store, accent: '#2563eb' },
-                        { label: 'Stockist', value: summary.stockist, icon: Database, accent: '#7c3aed' },
+                        { label: 'Total bisnis', value: summary.total, icon: Building2, accent: 'var(--brand)' },
+                        { label: 'Aktif', value: summary.active, icon: ShieldCheck, accent: 'var(--brand)' },
+                        { label: 'Cafe', value: summary.cafe, icon: Store, accent: 'var(--brand)' },
+                        { label: 'Stockist', value: summary.stockist, icon: Database, accent: 'var(--brand)' },
                     ].map(item => <article key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 17, background: '#fff', boxShadow: '0 2px 8px #0f172a08' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: 13 }}>{item.label}<item.icon size={18} color={item.accent} /></div>
                         <strong style={{ display: 'block', marginTop: 12, fontSize: 29 }}>{loading ? '—' : Number(item.value || 0).toLocaleString('id-ID')}</strong>
@@ -173,7 +174,7 @@ export default function SuperadminDashboard() {
                 <section style={{ marginTop: 22, border: '1px solid #e2e8f0', borderRadius: 15, background: '#fff', overflow: 'hidden', boxShadow: '0 4px 14px #0f172a08' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 18, borderBottom: '1px solid #e2e8f0' }}>
                         <div><h2 style={{ margin: 0, fontSize: 18 }}>Akun bisnis</h2><p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>Setiap bisnis memiliki database sendiri dan Admin pertamanya.</p></div>
-                        <button onClick={() => setShowForm(value => !value)} disabled={!setup.provisioningConfigured} style={{ border: 0, borderRadius: 9, padding: '10px 14px', color: '#fff', background: setup.provisioningConfigured ? '#0f766e' : '#94a3b8', fontWeight: 700, cursor: setup.provisioningConfigured ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>{showForm ? 'Tutup' : '+ Buat bisnis'}</button>
+                        <button onClick={() => setShowForm(value => !value)} disabled={!setup.provisioningConfigured} style={{ border: 0, borderRadius: 9, padding: '10px 14px', color: '#fff', background: setup.provisioningConfigured ? 'var(--brand)' : '#94a3b8', fontWeight: 700, cursor: setup.provisioningConfigured ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>{showForm ? 'Tutup' : '+ Buat bisnis'}</button>
                     </div>
 
                     {lastCredential && <div style={{ margin: 16, padding: 15, borderRadius: 11, background: '#ecfdf5', border: '1px solid #bbf7d0' }}>
@@ -193,7 +194,7 @@ export default function SuperadminDashboard() {
                         <label style={{ fontSize: 13, fontWeight: 700 }}>Password awal Admin<input required type="password" minLength={10} value={form.adminPassword} onChange={e => setForm(current => ({ ...current, adminPassword: e.target.value }))} style={inputStyle} autoComplete="new-password" /></label>
                         <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                             <span style={{ color: '#64748b', fontSize: 12 }}>Password ditentukan Superadmin dan hanya ditampilkan sekali setelah dibuat.</span>
-                            <button disabled={saving} style={{ border: 0, borderRadius: 9, padding: '11px 18px', color: '#fff', background: '#0f766e', fontWeight: 700 }}>{saving ? 'Membuat database…' : 'Buat bisnis & Admin'}</button>
+                            <button disabled={saving} style={{ border: 0, borderRadius: 9, padding: '11px 18px', color: '#fff', background: 'var(--brand)', fontWeight: 700 }}>{saving ? 'Membuat database…' : 'Buat bisnis & Admin'}</button>
                         </div>
                     </form>}
 
@@ -202,13 +203,13 @@ export default function SuperadminDashboard() {
                             <thead style={{ color: '#64748b', fontSize: 12, background: '#f8fafc' }}><tr>{['Bisnis', 'Jenis', 'Admin', 'Kasir', 'Database', 'Koneksi', 'Status', 'Aksi'].map(header => <th key={header} style={{ padding: '12px 14px', fontWeight: 700 }}>{header}</th>)}</tr></thead>
                             <tbody>
                                 {businesses.map(business => <tr key={business.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                                    <td style={{ padding: '14px', fontWeight: 700 }}>{business.name}<small style={{ display: 'block', marginTop: 3, color: '#64748b', fontWeight: 400 }}>{business.slug}</small></td>
-                                    <td style={{ padding: '14px' }}>{business.business_type === 'stockist' ? 'Stockist' : 'Cafe'}</td>
-                                    <td style={{ padding: '14px' }}>{business.admin_username}</td><td style={{ padding: '14px' }}>{business.cashier_count}</td>
-                                    <td style={{ padding: '14px' }}><code>{business.database_name}</code></td>
-                                    <td style={{ padding: '14px', color: business.health === 'connected' ? '#15803d' : business.health === 'error' ? '#b91c1c' : '#64748b' }}>{business.health === 'connected' ? 'Terhubung' : business.health === 'error' ? 'Bermasalah' : business.health === 'suspended' ? 'Ditangguhkan' : '—'}</td>
-                                    <td style={{ padding: '14px' }}>{business.status === 'active' ? 'Aktif' : 'Ditangguhkan'}</td>
-                                    <td style={{ padding: '14px' }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button onClick={() => void openAccountManager(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>Kelola akun</button><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></div></td>
+                                    <td data-label="Bisnis" style={{ padding: '14px', fontWeight: 700 }}>{business.name}<small style={{ display: 'block', marginTop: 3, color: '#64748b', fontWeight: 400 }}>{business.slug}</small></td>
+                                    <td data-label="Jenis" style={{ padding: '14px' }}>{business.business_type === 'stockist' ? 'Stockist' : 'Cafe'}</td>
+                                    <td data-label="Admin" style={{ padding: '14px' }}>{business.admin_username}</td><td data-label="Kasir" style={{ padding: '14px' }}>{business.cashier_count}</td>
+                                    <td data-label="Database" style={{ padding: '14px' }}><code>{business.database_name}</code></td>
+                                    <td data-label="Koneksi" style={{ padding: '14px', color: business.health === 'connected' ? '#15803d' : business.health === 'error' ? '#b91c1c' : '#64748b' }}>{business.health === 'connected' ? 'Terhubung' : business.health === 'error' ? 'Bermasalah' : business.health === 'suspended' ? 'Ditangguhkan' : '—'}</td>
+                                    <td data-label="Status" style={{ padding: '14px' }}>{business.status === 'active' ? 'Aktif' : 'Ditangguhkan'}</td>
+                                    <td data-label="Aksi" style={{ padding: '14px' }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button onClick={() => void openAccountManager(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>Kelola akun</button><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></div></td>
                                 </tr>)}
                                 {!loading && !businesses.length && <tr><td colSpan={8} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>{setup.configured ? 'Belum ada akun bisnis. Buat akun bisnis pertama.' : 'Hubungkan database platform untuk memuat daftar bisnis.'}</td></tr>}
                             </tbody>
@@ -222,7 +223,7 @@ export default function SuperadminDashboard() {
                             <button type="button" onClick={() => setManagedBusiness(null)} style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '7px 11px', background: '#fff', cursor: 'pointer' }}>Tutup</button>
                         </div>
                         <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-                            {managedAccounts.map(account => <form key={account.id} onSubmit={event => { event.preventDefault(); void saveAccount(account); }} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px,.6fr) repeat(2,minmax(150px,1fr)) auto', gap: 9, alignItems: 'end', padding: 12, border: '1px solid #e2e8f0', borderRadius: 10 }}>
+                            {managedAccounts.map(account => <form key={account.id} onSubmit={event => { event.preventDefault(); void saveAccount(account); }} className="superadmin-account-form">
                                 <strong style={{ paddingBottom: 10 }}>{account.role}</strong>
                                 <label style={{ fontSize: 12, fontWeight: 700 }}>Username<input required minLength={3} maxLength={40} value={accountDrafts[account.id]?.username || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), username: event.target.value } }))} style={inputStyle} /></label>
                                 <label style={{ fontSize: 12, fontWeight: 700 }}>Password baru<input required type="password" minLength={10} maxLength={128} autoComplete="new-password" value={accountDrafts[account.id]?.password || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), password: event.target.value } }))} style={inputStyle} placeholder="Minimal 10 karakter" /></label>
