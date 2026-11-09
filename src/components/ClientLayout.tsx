@@ -25,6 +25,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const pathname = usePathname();
 
     const isLoginPage = pathname === '/login' || pathname.startsWith('/superadmin');
+    const adminPanelPaths = ['/', '/produk', '/bahan-baku', '/laporan', '/akses-api', '/akun-kasir', '/pengaturan'];
+    const isAdminPanel = adminPanelPaths.some(path => pathname === path || (path !== '/' && pathname.startsWith(path + '/')));
 
     const isSidebarCollapsed = isMobile ? !isSidebarOpenMobile : isSidebarCollapsedDesktop;
 
@@ -123,7 +125,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 </svg>
             </button>
 
-            <main className="main-content">
+            <main className={ 'main-content' + (isAdminPanel ? ' admin-panel-shell' : '') }>
                 {children}
             </main>
         </div>
