@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
     if (path === '/api/auth/login' || path === '/api/auth/logout' || path === '/api/superadmin/login') return NextResponse.next();
 
     // External endpoints authenticate their own scoped Bearer keys.
-    if (path === '/api/v1/menu' || path === '/api/v1/orders') return NextResponse.next();
+    if (path === '/api/v1/menu' || path === '/api/v1/orders' || path === '/api/public/store-name') return NextResponse.next();
 
     // PWA resources must remain public even when a session is expired.
     const isPwaResource = path === '/sw.js' || path === '/manifest.json' ||

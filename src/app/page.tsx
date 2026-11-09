@@ -24,6 +24,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [period, setPeriod] = useState<'hourly' | 'daily' | 'monthly'>('hourly');
+  const [storeName, setStoreName] = useState('Toko');
+  useEffect(() => {
+    fetch('/api/public/store-name', { cache: 'no-store' })
+      .then(response => response.json())
+      .then(body => { if (body.success && body.data?.name) setStoreName(body.data.name); })
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     async function refresh() {
@@ -43,7 +50,7 @@ export default function DashboardPage() {
   return (
     <div className="admin-workspace">
       <header className="admin-header">
-        <div><p className="admin-eyebrow">ADMINISTRASI</p><h1>Dashboard</h1><p>Penjualan & operasional</p></div>
+        <div><p className="admin-eyebrow">{storeName.toUpperCase()} · ADMINISTRASI</p><h1>Dashboard</h1><p>Ringkasan penjualan dan operasional toko</p></div>
         <div className="admin-actions">
           <input aria-label="Tanggal ringkasan" type="date" value={date} max={today()} onChange={e => e.target.value && setDate(e.target.value)} />
           <button className="admin-icon" title="Muat ulang ringkasan" aria-label="Muat ulang ringkasan" disabled={loading} onClick={() => setRevision(r => r + 1)}><RefreshCw size={18} className={loading ? 'admin-spin' : ''} /></button>

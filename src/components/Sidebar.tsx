@@ -36,6 +36,7 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
     const pathname = usePathname();
     const router = useRouter();
     const [draftCount, setDraftCount] = useState(0);
+    const [storeName, setStoreName] = useState('KasirPOS');
 
     const handleLogout = async () => {
         try {
@@ -52,6 +53,13 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
         return item.access.some(role => role.toLowerCase() === normalizedRole);
     });
     const shouldShowKasirActions = pathname === '/kasir' && normalizedRole === 'kasir';
+
+    useEffect(() => {
+        fetch('/api/public/store-name', { cache: 'no-store' })
+            .then(response => response.json())
+            .then(body => { if (body.success && body.data?.name) setStoreName(body.data.name); })
+            .catch(() => undefined);
+    }, []);
 
     useEffect(() => {
         const handleDraftCount = (event: Event) => {
@@ -91,7 +99,7 @@ export default function Sidebar({ isCollapsed, onToggle, userRole, username, onN
                             }}
                         />
                     </div>
-                    {!isCollapsed && <span className="logo-text">KasirPOS</span>}
+                    {!isCollapsed && <span className="logo-text" title={storeName}>{storeName}</span>}
                 </div>
                 <button
                     className="sidebar-toggle"

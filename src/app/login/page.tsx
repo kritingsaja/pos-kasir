@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -8,7 +8,15 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [storeName, setStoreName] = useState('KasirPOS');
     const router = useRouter();
+
+    useEffect(() => {
+        fetch('/api/public/store-name', { cache: 'no-store' })
+            .then(response => response.json())
+            .then(body => { if (body.success && body.data?.name) setStoreName(body.data.name); })
+            .catch(() => undefined);
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,8 +62,8 @@ export default function LoginPage() {
             <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '32px' }}>
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
-                    <h1 style={{ margin: 0, color: 'var(--text-primary)' }}>KasirPOS</h1>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke akun Anda</p>
+                    <h1 style={{ margin: 0, color: 'var(--text-primary)' }}>{storeName}</h1>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke akun {storeName}</p>
                 </div>
 
                 {error && (
