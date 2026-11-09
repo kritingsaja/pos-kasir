@@ -64,6 +64,7 @@ export interface Product {
     kode_barang: string;
     nama_barang: string;
     harga_jual: number;
+    harga_beli?: number;
     diskon: number;
     tipe_diskon: number;
     kategori: string;
