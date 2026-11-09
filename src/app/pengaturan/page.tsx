@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { DEFAULT_QRIS_STATIC_PAYLOAD } from '@/lib/qris';
+import '../admin.css';
 
 export default function PengaturanPage() {
     const [settings, setSettings] = useState({
@@ -67,13 +68,13 @@ export default function PengaturanPage() {
     }
 
     return (
-        <>
-            <div className="page-header">
+        <div className="admin-legacy-page">
+            <div className="admin-page-header">
                 <h1>Pengaturan</h1>
                 <p>Konfigurasi toko dan nota</p>
             </div>
 
-            <div style={{ maxWidth: '600px' }}>
+            <div className="admin-settings-content">
                 {/* ── Organisasi Produk ── */}
                 <div className="card" style={{ marginBottom: '20px' }}>
                     <div className="card-header">
@@ -450,7 +451,7 @@ export default function PengaturanPage() {
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 }
 
