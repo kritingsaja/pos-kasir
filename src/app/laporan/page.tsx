@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, formatRupiah, formatDate, CartItem } from '@/lib/utils';
 import { formatPaymentBreakdown, getPaymentMethodLabel } from '@/lib/cash-payment';
-import { BarChart3, CalendarDays, CalendarRange, FileDown, Package, Receipt, Tags, Wallet } from 'lucide-react';
+import { BarChart3, CalendarDays, FileDown, Receipt, Wallet } from 'lucide-react';
 import './laporan.css';
 
 /* ── Month names in Indonesian ── */
