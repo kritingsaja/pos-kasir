@@ -4701,3 +4701,76 @@ dialog[open].lp-modal-dialog {
   }
 }
 
+
+
+/* ── Admin panels: shared warm brand and component surfaces ── */
+.main-content.admin-panel-shell {
+  min-width: 0;
+  background: var(--bg-base);
+  color: var(--text-900);
+}
+.admin-panel-shell > * { min-width: 0; }
+.admin-panel-shell .page-header { margin-bottom: 20px; }
+.admin-panel-shell .page-header h1 { color: var(--text-900); }
+.admin-panel-shell .page-header p,
+.admin-panel-shell .page-header .subtitle { color: var(--text-500); }
+.admin-panel-shell .card,
+.admin-panel-shell .glass-card {
+  background: var(--bg-surface);
+  border-color: var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-xs);
+}
+.admin-panel-shell .card-header {
+  gap: 12px;
+  flex-wrap: wrap;
+  border-color: var(--border-soft);
+}
+.admin-panel-shell .card-header h2 { color: var(--text-900); }
+.admin-panel-shell .btn-primary,
+.admin-panel-shell .admin-button:not(.secondary) {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+}
+.admin-panel-shell .btn-primary:hover,
+.admin-panel-shell .admin-button:not(.secondary):hover { background: var(--brand-light); border-color: var(--brand-light); }
+.admin-panel-shell .btn-secondary,
+.admin-panel-shell .admin-button.secondary {
+  color: var(--text-700);
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+.admin-panel-shell .tab-group button.active,
+.admin-panel-shell .tab-group [aria-selected="true"],
+.admin-panel-shell .admin-tabs button[aria-selected="true"],
+.admin-panel-shell .admin-segment button[aria-pressed="true"],
+.admin-panel-shell .lp-period-tabs button[aria-pressed="true"],
+.admin-panel-shell .lp-view-tabs button[aria-pressed="true"] {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+.admin-panel-shell .search-bar input,
+.admin-panel-shell .input-group input,
+.admin-panel-shell .input-group select,
+.admin-panel-shell .input-group textarea,
+.admin-panel-shell .form-control {
+  border-color: var(--border);
+  border-radius: var(--r-sm);
+}
+.admin-panel-shell :focus-visible {
+  outline-color: var(--brand);
+}
+.admin-panel-shell .table-container,
+.admin-panel-shell .table-responsive,
+.admin-panel-shell .admin-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }
+.admin-panel-shell .modal,
+.admin-panel-shell .modal-content { max-width: calc(100vw - 28px); }
+.admin-panel-shell .container { width: 100%; max-width: 1500px; margin-inline: auto; }
+@media (max-width: 768px) {
+  .main-content.admin-panel-shell { padding: 16px 14px calc(28px + env(safe-area-inset-bottom, 0px)); }
+  .admin-panel-shell .container { padding-inline: 0; }
+  .admin-panel-shell .page-header { padding-left: 46px; }
+  .admin-panel-shell .card { padding: 16px; }
+}
