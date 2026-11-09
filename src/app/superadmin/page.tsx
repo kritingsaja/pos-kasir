@@ -211,7 +211,7 @@ export default function SuperadminDashboard() {
                                     <td data-label="Status" style={{ padding: '14px' }}>{business.status === 'active' ? 'Aktif' : 'Ditangguhkan'}</td>
                                     <td data-label="Aksi" style={{ padding: '14px' }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button onClick={() => void openAccountManager(business)} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>Kelola akun</button><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></div></td>
                                 </tr>)}
-                                {!loading && !businesses.length && <tr><td colSpan={8} style={{ padding: 28, textAlign: 'center', color: 'var(--text-500)' }}>{setup.configured ? 'Belum ada akun bisnis. Buat akun bisnis pertama.' : 'Hubungkan database platform untuk memuat daftar bisnis.'}</td></tr>}
+                                {!loading && !businesses.length && <tr className="superadmin-empty-row"><td colSpan={8} style={{ padding: 28, textAlign: 'center', color: 'var(--text-500)' }}>{setup.configured ? 'Belum ada akun bisnis. Buat akun bisnis pertama.' : 'Hubungkan database platform untuk memuat daftar bisnis.'}</td></tr>}
                             </tbody>
                         </table>
                     </div>
