@@ -8,6 +8,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -26,7 +27,9 @@ export default function LoginPage() {
 
             if (res.ok && data.success) {
                 // Redirect based on role
-                if (data.data.role === 'Kasir') {
+                if (data.data.role === 'Superadmin') {
+                    router.push('/superadmin');
+                } else if (data.data.role === 'Kasir') {
                     router.push('/kasir');
                 } else {
                     router.push('/');
@@ -53,7 +56,7 @@ export default function LoginPage() {
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
                     <h1 style={{ margin: 0, color: 'var(--text-primary)' }}>KasirPOS</h1>
-                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke akun Anda</p>
+                    <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>Masuk ke aplikasi kasir</p>
                 </div>
 
                 {error && (
@@ -85,15 +88,28 @@ export default function LoginPage() {
                     </div>
 
                     <div className="form-group">
-                        <label>Password</label>
-                        <input
-                            type="password"
-                            className="form-control"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            placeholder="Masukkan password..."
-                        />
+                        <label htmlFor="login-password">Password</label>
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                id="login-password"
+                                type={showPassword ? 'text' : 'password'}
+                                className="form-control"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                placeholder="Masukkan password..."
+                                style={{ paddingRight: 76 }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(value => !value)}
+                                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                                aria-pressed={showPassword}
+                                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', color: 'var(--text-muted)', padding: '6px 8px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                            >
+                                {showPassword ? 'Sembunyikan' : 'Lihat'}
+                            </button>
+                        </div>
                     </div>
 
                     <button

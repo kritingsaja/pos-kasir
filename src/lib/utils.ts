@@ -49,6 +49,7 @@ export interface CartItem {
     kode_barang: string;
     nama_barang: string;
     harga_jual: number;
+    harga_beli?: number;
     harga_override?: number;  // manual price override by kasir
     qty: number;
     diskon: number;
@@ -63,6 +64,7 @@ export interface Product {
     kode_barang: string;
     nama_barang: string;
     harga_jual: number;
+    harga_beli?: number;
     diskon: number;
     tipe_diskon: number;
     kategori: string;

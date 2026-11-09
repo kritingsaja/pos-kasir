@@ -24,6 +24,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [period, setPeriod] = useState<'hourly' | 'daily' | 'monthly'>('hourly');
+  const [storeName, setStoreName] = useState('Toko');
+  useEffect(() => {
+    fetch('/api/public/store-name', { cache: 'no-store' })
+      .then(response => response.json())
+      .then(body => { if (body.success && body.data?.name) setStoreName(body.data.name); })
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     async function refresh() {
@@ -43,7 +50,7 @@ export default function DashboardPage() {
   return (
     <div className="admin-workspace">
       <header className="admin-header">
-        <div><p className="admin-eyebrow">ADMINISTRASI</p><h1>Dashboard</h1><p>Penjualan & operasional</p></div>
+        <div><p className="admin-eyebrow">{storeName.toUpperCase()} · ADMINISTRASI</p><h1>Dashboard</h1><p>Ringkasan penjualan dan operasional toko</p></div>
         <div className="admin-actions">
           <input aria-label="Tanggal ringkasan" type="date" value={date} max={today()} onChange={e => e.target.value && setDate(e.target.value)} />
           <button className="admin-icon" title="Muat ulang ringkasan" aria-label="Muat ulang ringkasan" disabled={loading} onClick={() => setRevision(r => r + 1)}><RefreshCw size={18} className={loading ? 'admin-spin' : ''} /></button>
@@ -69,7 +76,7 @@ export default function DashboardPage() {
           <div className="admin-section-heading"><div><h2>Tren penjualan</h2><p>{period === 'hourly' ? date : period === 'daily' ? date.slice(0, 7) : date.slice(0, 4)} <span className="admin-muted">/ WIB</span></p></div>
             <div className="admin-segment" role="group" aria-label="Periode grafik">{([{ id: 'hourly', label: 'Hari' }, { id: 'daily', label: 'Bulan' }, { id: 'monthly', label: 'Tahun' }] as const).map(p => <button key={p.id} aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>{p.label}</button>)}</div>
           </div>
-          <div className="admin-chart">{ready ? <ResponsiveContainer width="100%" height="100%"><BarChart data={data.graphs[period]} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid vertical={false} stroke="#e5e9e8" /><XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} /><YAxis width={58} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={value => `${Number(value) / 1000} rb`} /><Tooltip formatter={value => [formatRupiah(Number(value)), 'Penjualan']} cursor={{ fill: '#f0f5f2' }} /><Bar dataKey="total" fill="#278368" radius={[3, 3, 0, 0]} maxBarSize={32} /></BarChart></ResponsiveContainer> : <div className="admin-empty">{loading ? 'Memuat ringkasan...' : 'Ringkasan tidak tersedia'}</div>}</div>
+          <div className="admin-chart">{ready ? <ResponsiveContainer width="100%" height="100%"><BarChart data={data.graphs[period]} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid vertical={false} stroke="#ece8e2" /><XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} /><YAxis width={58} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={value => `${Number(value) / 1000} rb`} /><Tooltip formatter={value => [formatRupiah(Number(value)), 'Penjualan']} cursor={{ fill: '#f5f3f0' }} /><Bar dataKey="total" fill="#7c5c3e" radius={[3, 3, 0, 0]} maxBarSize={32} /></BarChart></ResponsiveContainer> : <div className="admin-empty">{loading ? 'Memuat ringkasan...' : 'Ringkasan tidak tersedia'}</div>}</div>
         </section>
         <section className="admin-section"><div className="admin-section-heading"><h2>Menu terlaris</h2><span className="admin-muted">{date}</span></div>
           {ready && data.topProducts.length ? <ol className="admin-top-list">{data.topProducts.map((p, i) => <li key={`${i}-${p.nama}`}><span className="admin-rank">{String(i + 1).padStart(2, '0')}</span><div><strong>{p.nama}</strong><small>{formatRupiah(p.total)}</small></div><b>{p.qty} <small>item</small></b></li>)}</ol> : <p className="admin-empty">{loading ? 'Memuat...' : error ? 'Data tidak tersedia' : 'Belum ada menu terjual'}</p>}

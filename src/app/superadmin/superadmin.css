@@ -1,0 +1,90 @@
+.superadmin-dashboard {
+  --sa-line: var(--border, #e0d9d0);
+  --sa-muted: var(--text-500, #766b61);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+  padding: clamp(16px, 3vw, 32px) clamp(14px, 4vw, 56px);
+  color: var(--text-900, #1c1814);
+  background: var(--bg-base, #f5f3f0);
+}
+.superadmin-dashboard *,
+.superadmin-dashboard *::before,
+.superadmin-dashboard *::after { box-sizing: border-box; }
+.superadmin-container { width: min(100%, 1320px); min-width: 0; margin: 0 auto; }
+.superadmin-dashboard header { min-width: 0; }
+.superadmin-dashboard header > div:first-child { min-width: 0; }
+.superadmin-dashboard header p { line-height: 1.5; }
+.superadmin-dashboard section,
+.superadmin-dashboard article { min-width: 0; }
+.superadmin-dashboard input,
+.superadmin-dashboard select { max-width: 100%; }
+.superadmin-dashboard code { overflow-wrap: anywhere; }
+.superadmin-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.superadmin-business-table { width: 100%; border-collapse: collapse; min-width: 760px; text-align: left; }
+.superadmin-account-form {
+  display: grid;
+  grid-template-columns: minmax(110px, .6fr) repeat(2, minmax(150px, 1fr)) auto;
+  gap: 9px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--sa-line);
+  border-radius: 10px;
+}
+@media (max-width: 760px) {
+  .superadmin-dashboard { padding: 16px 12px 24px; }
+  .superadmin-dashboard > .superadmin-container > header { align-items: flex-start !important; }
+  .superadmin-dashboard > .superadmin-container > header > div:first-child { flex: 1; }
+  .superadmin-dashboard > .superadmin-container > header p { max-width: 42ch; font-size: 14px; }
+  .superadmin-dashboard > .superadmin-container > section[aria-label="Ringkasan akun bisnis"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .superadmin-business-table { min-width: 0; display: block; }
+  .superadmin-business-table thead { display: none; }
+  .superadmin-business-table tbody { display: grid; gap: 10px; padding: 10px; }
+  .superadmin-business-table tbody tr:not(.superadmin-empty-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+    border: 1px solid var(--sa-line);
+    border-radius: 11px;
+    overflow: hidden;
+    background: var(--bg-surface, #fff);
+  }
+  .superadmin-business-table tbody td {
+    display: block;
+    min-width: 0;
+    padding: 10px 12px !important;
+    border-top: 1px solid var(--sa-line);
+    overflow-wrap: anywhere;
+  }
+  .superadmin-business-table tbody td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--sa-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+  .superadmin-business-table tbody td:first-child,
+  .superadmin-business-table tbody td[data-label="Aksi"] { grid-column: 1 / -1; }
+  .superadmin-business-table tbody td[data-label="Aksi"] > div { gap: 7px !important; }
+  .superadmin-business-table tbody .superadmin-empty-row td { display: block; padding: 20px 12px !important; }
+  .superadmin-account-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .superadmin-account-form > strong { grid-column: 1 / -1; }
+  .superadmin-account-form > label { min-width: 0; }
+  .superadmin-account-form > button { grid-column: 1 / -1; }
+}
+@media (max-width: 440px) {
+  .superadmin-dashboard > .superadmin-container > header { flex-wrap: wrap; }
+  .superadmin-dashboard > .superadmin-container > header > div:first-child { flex-basis: 100%; }
+  .superadmin-dashboard > .superadmin-container > header > div:last-child { margin-left: auto; }
+  .superadmin-dashboard > .superadmin-container > section[aria-label="Ringkasan akun bisnis"] { gap: 8px !important; }
+  .superadmin-dashboard > .superadmin-container > section[aria-label="Ringkasan akun bisnis"] article { padding: 12px !important; }
+  .superadmin-account-form { grid-template-columns: minmax(0, 1fr); }
+  .superadmin-account-form > strong,
+  .superadmin-account-form > button { grid-column: auto; }
+  .superadmin-business-panel > div:first-child { align-items: flex-start !important; flex-wrap: wrap; }
+}

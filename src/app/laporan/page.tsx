@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, formatRupiah, formatDate, CartItem } from '@/lib/utils';
 import { formatPaymentBreakdown, getPaymentMethodLabel } from '@/lib/cash-payment';
+import { BarChart3, CalendarDays, FileDown, Package, Receipt, Tags, Wallet } from 'lucide-react';
+import './laporan.css';
 
 /* ── Month names in Indonesian ── */
 const BULAN_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -233,12 +235,16 @@ export default function LaporanPage() {
 
     /* ══════════════════ RENDER ══════════════════ */
     return (
-        <>
+        <div className="lp-page">
             {/* ── PAGE HEADER ── */}
-            <div className="page-header">
-                <h1>📊 Laporan Penjualan</h1>
-                <p>{periodLabel}</p>
-            </div>
+            <header className="lp-page-header">
+                <div className="lp-title-group">
+                    <span className="lp-eyebrow"><BarChart3 size={15} /> ANALISIS PENJUALAN</span>
+                    <h1>Laporan Penjualan</h1>
+                    <p>Ringkasan transaksi, produk, dan kategori penjualan.</p>
+                </div>
+                <div className="lp-period-summary"><CalendarDays size={17} /><span>{periodLabel}</span></div>
+            </header>
 
             {/* ── PERIOD SELECTOR PILLS ── */}
             <div className="lp-period-tabs">
@@ -248,7 +254,7 @@ export default function LaporanPage() {
                         className={`lp-period-pill ${reportPeriod === p ? 'active' : ''}`}
                         onClick={() => setReportPeriod(p)}
                     >
-                        {p === 'harian' ? '📅 Harian' : p === 'bulanan' ? '🗓️ Bulanan' : '📆 Tahunan'}
+                        {p === 'harian' ? 'Harian' : p === 'bulanan' ? 'Bulanan' : 'Tahunan'}
                     </button>
                 ))}
             </div>
@@ -266,7 +272,7 @@ export default function LaporanPage() {
                             <input type="date" className="lp-filter-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
                         </div>
                         <button className="lp-export-btn" onClick={handleExport} disabled={exporting || !transactions.length}>
-                            {exporting ? <span className="lp-spinner" /> : '📤'} Export
+                            {exporting ? <span className="lp-spinner" /> : <FileDown size={16} />} {exporting ? 'Menyiapkan…' : 'Export'}
                         </button>
                     </div>
                 )}
@@ -277,7 +283,7 @@ export default function LaporanPage() {
                             <input type="month" className="lp-filter-input" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
                         </div>
                         <button className="lp-export-btn" onClick={handleExport} disabled={exporting || !transactions.length}>
-                            {exporting ? <span className="lp-spinner" /> : '📤'} Export
+                            {exporting ? <span className="lp-spinner" /> : <FileDown size={16} />} Export
                         </button>
                     </div>
                 )}
@@ -288,7 +294,7 @@ export default function LaporanPage() {
                             <input type="number" min="2000" max="2100" className="lp-filter-input" style={{ maxWidth: 120 }} value={selectedYear} onChange={e => setSelectedYear(e.target.value)} />
                         </div>
                         <button className="lp-export-btn" onClick={handleExport} disabled={exporting || !transactions.length}>
-                            {exporting ? <span className="lp-spinner" /> : '📤'} Export
+                            {exporting ? <span className="lp-spinner" /> : <FileDown size={16} />} Export
                         </button>
                     </div>
                 )}
@@ -297,21 +303,21 @@ export default function LaporanPage() {
             {/* ── SUMMARY STAT CARDS ── */}
             <div className="lp-stats-row">
                 <div className="lp-stat-card green">
-                    <div className="lp-stat-icon">💰</div>
+                    <div className="lp-stat-icon"><Wallet size={20} /></div>
                     <div className="lp-stat-body">
                         <div className="lp-stat-value">{formatRupiah(totalPenjualan)}</div>
                         <div className="lp-stat-label">Total Penjualan</div>
                     </div>
                 </div>
                 <div className="lp-stat-card blue">
-                    <div className="lp-stat-icon">🧾</div>
+                    <div className="lp-stat-icon"><Receipt size={20} /></div>
                     <div className="lp-stat-body">
                         <div className="lp-stat-value">{transactions.length}</div>
                         <div className="lp-stat-label">Transaksi</div>
                     </div>
                 </div>
                 <div className="lp-stat-card amber">
-                    <div className="lp-stat-icon">📈</div>
+                    <div className="lp-stat-icon"><BarChart3 size={20} /></div>
                     <div className="lp-stat-body">
                         <div className="lp-stat-value">{formatRupiah(avgTransaction)}</div>
                         <div className="lp-stat-label">Rata-rata/Trx</div>
@@ -327,7 +333,7 @@ export default function LaporanPage() {
                         onClick={() => setReportView(v)}
                         className={`lp-view-tab ${reportView === v ? 'active' : ''}`}
                     >
-                        {v === 'transactions' ? '🧾 Transaksi' : v === 'products' ? '📦 Produk' : '🏷️ Kategori'}
+                        {v === 'transactions' ? 'Transaksi' : v === 'products' ? 'Produk' : 'Kategori'}
                     </button>
                 ))}
             </div>
@@ -369,7 +375,7 @@ export default function LaporanPage() {
                     {reportView === 'transactions' && reportPeriod === 'bulanan' && (
                         monthlySummary.length === 0 ? (
                             <div className="lp-empty">
-                                <div className="lp-empty-icon">📅</div>
+                                <div className="lp-empty-icon"><CalendarDays size={22} /></div>
                                 <p>Tidak ada transaksi bulan ini</p>
                             </div>
                         ) : (
@@ -400,7 +406,7 @@ export default function LaporanPage() {
                     {reportView === 'transactions' && reportPeriod === 'harian' && (
                         transactions.length === 0 ? (
                             <div className="lp-empty">
-                                <div className="lp-empty-icon">📋</div>
+                                <div className="lp-empty-icon"><Receipt size={22} /></div>
                                 <p>Tidak ada transaksi pada periode ini</p>
                             </div>
                         ) : (
@@ -412,7 +418,7 @@ export default function LaporanPage() {
                     {reportView === 'products' && (
                         productSummary.length === 0 ? (
                             <div className="lp-empty">
-                                <div className="lp-empty-icon">📦</div>
+                                <div className="lp-empty-icon"><Package size={22} /></div>
                                 <p>Tidak ada data produk</p>
                             </div>
                         ) : (
@@ -443,7 +449,7 @@ export default function LaporanPage() {
                     {reportView === 'categories' && (
                         categorySummary.length === 0 ? (
                             <div className="lp-empty">
-                                <div className="lp-empty-icon">🏷️</div>
+                                <div className="lp-empty-icon"><Tags size={22} /></div>
                                 <p>Tidak ada data kategori</p>
                             </div>
                         ) : (
@@ -526,6 +532,6 @@ export default function LaporanPage() {
                     <button onClick={() => setExpandedTrx(null)}>close</button>
                 </form>
             </dialog>
-        </>
+        </div>
     );
 }

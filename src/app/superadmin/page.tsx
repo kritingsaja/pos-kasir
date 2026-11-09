@@ -1,0 +1,240 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
+import { Building2, CircleAlert, Database, RefreshCw, ShieldCheck, Store, Users } from 'lucide-react';
+import './superadmin.css';
+
+type Business = {
+    id: string; name: string; slug: string; business_type: 'cafe' | 'stockist';
+    status: 'active' | 'suspended'; admin_username: string; cashier_count: number;
+    database_name: string; created_at: string; health: 'connected' | 'error' | 'suspended' | 'unknown';
+};
+type ManagedAccount = { id: string; username: string; role: 'Admin' | 'Kasir'; active: number; created_at?: string };
+type Summary = { total: number; active: number; suspended: number; cafe: number; stockist: number };
+type Setup = { configured: boolean; provisioningConfigured: boolean; missing?: string[] };
+
+const emptySummary: Summary = { total: 0, active: 0, suspended: 0, cafe: 0, stockist: 0 };
+
+export default function SuperadminDashboard() {
+    const [businesses, setBusinesses] = useState<Business[]>([]);
+    const [summary, setSummary] = useState(emptySummary);
+    const [setup, setSetup] = useState<Setup>({ configured: false, provisioningConfigured: false });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [showForm, setShowForm] = useState(false);
+    const [lastCredential, setLastCredential] = useState<{ business: string; username: string; password: string } | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
+    const [managedBusiness, setManagedBusiness] = useState<Business | null>(null);
+    const [managedAccounts, setManagedAccounts] = useState<ManagedAccount[]>([]);
+    const [accountDrafts, setAccountDrafts] = useState<Record<string, { username: string; password: string }>>({});
+    const [form, setForm] = useState({ name: '', slug: '', businessType: 'stockist', adminUsername: '', adminPassword: '' });
+
+    const load = useCallback(async () => {
+        setLoading(true); setError('');
+        try {
+            const response = await fetch('/api/superadmin/businesses', { cache: 'no-store' });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Data bisnis gagal dimuat.');
+            setBusinesses(body.businesses || []);
+            setSummary({ ...emptySummary, ...(body.summary || {}) });
+            setSetup({ configured: Boolean(body.configured), provisioningConfigured: Boolean(body.provisioningConfigured), missing: body.missing || [] });
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Data bisnis gagal dimuat.');
+        } finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { void load(); }, [load]);
+
+    function changeName(value: string) {
+        const slug = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32);
+        setForm(current => ({ ...current, name: value, slug }));
+    }
+
+    async function createBusiness(event: FormEvent) {
+        event.preventDefault(); setSaving(true); setError(''); setSuccess('');
+        try {
+            const response = await fetch('/api/superadmin/businesses', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+            });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Bisnis gagal dibuat.');
+            setLastCredential({ business: form.name, username: form.adminUsername, password: form.adminPassword });
+            setSuccess('Bisnis dan database terpisah berhasil dibuat.');
+            setForm({ name: '', slug: '', businessType: 'stockist', adminUsername: '', adminPassword: '' });
+            setShowForm(false);
+            await load();
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Bisnis gagal dibuat.');
+        } finally { setSaving(false); }
+    }
+
+    async function toggleStatus(business: Business) {
+        const status = business.status === 'active' ? 'suspended' : 'active';
+        if (!window.confirm(status === 'suspended' ? 'Nonaktifkan akses login bisnis ini?' : 'Aktifkan kembali bisnis ini?')) return;
+        setError(''); setSuccess('');
+        const response = await fetch('/api/superadmin/businesses', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: business.id, status }),
+        });
+        const body = await response.json();
+        if (!response.ok || !body.success) { setError(body.error || 'Status bisnis gagal diperbarui.'); return; }
+        setSuccess(status === 'suspended' ? 'Akses login bisnis dihentikan.' : 'Akses login bisnis diaktifkan kembali.');
+        await load();
+    }
+
+    async function openAccountManager(business: Business) {
+        setManagedBusiness(business); setManagedAccounts([]); setAccountDrafts({}); setError('');
+        try {
+            const response = await fetch('/api/superadmin/businesses/' + encodeURIComponent(business.id) + '/accounts', { cache: 'no-store' });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Daftar akun gagal dimuat.');
+            setManagedAccounts(body.accounts || []);
+            setAccountDrafts(Object.fromEntries((body.accounts || []).map((account: ManagedAccount) => [account.id, { username: account.username, password: '' }])));
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Daftar akun gagal dimuat.');
+        }
+    }
+
+    async function saveAccount(account: ManagedAccount) {
+        const draft = accountDrafts[account.id];
+        if (!draft) return;
+        setSaving(true); setError(''); setSuccess('');
+        try {
+            const response = await fetch('/api/superadmin/businesses/' + encodeURIComponent(managedBusiness!.id) + '/accounts', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId: account.id, username: draft.username, password: draft.password }),
+            });
+            const body = await response.json();
+            if (!response.ok || !body.success) throw new Error(body.error || 'Reset akun gagal.');
+            setSuccess('Login ' + account.role + ' berhasil diperbarui. Sampaikan username dan password baru kepada pemilik akun.');
+            setAccountDrafts(current => ({ ...current, [account.id]: { username: draft.username, password: '' } }));
+            await openAccountManager(managedBusiness!);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Reset akun gagal.');
+        } finally { setSaving(false); }
+    }
+
+    async function logout() {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.assign('/login');
+    }
+
+    const inputStyle: CSSProperties = { display: 'block', width: '100%', marginTop: 6, padding: '11px 12px', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-900)', background: '#fff' };
+
+    return (
+        <main className="superadmin-dashboard">
+            <div className="superadmin-container">
+                <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid var(--border-soft)', paddingBottom: 20 }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'var(--brand)', fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase' }}><ShieldCheck size={16} /> Platform KasirPOS</div>
+                        <h1 style={{ margin: '7px 0 3px', fontSize: 'clamp(25px, 4vw, 34px)', letterSpacing: '-.03em' }}>Dashboard Superadmin</h1>
+                        <p style={{ margin: 0, color: 'var(--text-500)' }}>Kelola akun bisnis dan status database tanpa melihat data penjualan.</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => void load()} disabled={loading} aria-label="Muat ulang" style={{ border: '1px solid var(--border)', borderRadius: 9, padding: 10, background: '#fff', cursor: 'pointer' }}><RefreshCw size={17} /></button>
+                        <button onClick={logout} style={{ border: '1px solid var(--border)', borderRadius: 9, padding: '9px 13px', background: '#fff', fontWeight: 700, cursor: 'pointer' }}>Keluar</button>
+                    </div>
+                </header>
+
+                {error && <div role="alert" style={{ marginTop: 18, padding: 13, border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c', borderRadius: 10 }}>{error}</div>}
+                {success && <div role="status" style={{ marginTop: 18, padding: 13, border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534', borderRadius: 10 }}>{success}</div>}
+
+                {!setup.configured && !loading && (
+                    <section style={{ marginTop: 22, padding: 20, border: '1px solid #fed7aa', background: '#fff7ed', borderRadius: 14 }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', color: '#9a3412', fontSize: 17 }}><CircleAlert size={19} /> Database platform belum dihubungkan</h2>
+                        <p style={{ margin: '0 0 12px', color: '#7c2d12', lineHeight: 1.6 }}>Buat satu database Turso kosong khusus untuk data akun bisnis. Aplikasi membuat tabel platform otomatis saat kredensialnya tersedia.</p>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {['PLATFORM_TURSO_URL', 'PLATFORM_TURSO_AUTH_TOKEN'].map(key => <code key={key} style={{ background: '#ffedd5', padding: '6px 9px', borderRadius: 7 }}>{key}</code>)}
+                        </div>
+                        {setup.missing?.length ? <p style={{ margin: '10px 0 0', color: '#9a3412', fontSize: 13 }}>Variabel belum tersedia: {setup.missing.join(', ')}</p> : null}
+                    </section>
+                )}
+                {setup.configured && !setup.provisioningConfigured && !loading && (
+                    <section style={{ marginTop: 22, padding: 18, border: '1px solid #fed7aa', background: '#fff7ed', borderRadius: 14 }}>
+                        <strong>Database platform terhubung, provisioning Turso belum siap.</strong>
+                        <p style={{ margin: '6px 0 0', color: '#7c2d12' }}>Tambahkan TURSO_ORG dan TURSO_API_TOKEN di environment Preview Vercel agar tombol buat bisnis dapat membuat database baru secara otomatis.</p>
+                    </section>
+                )}
+
+                <section aria-label="Ringkasan akun bisnis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: 13, marginTop: 22 }}>
+                    {[
+                        { label: 'Total bisnis', value: summary.total, icon: Building2, accent: 'var(--brand)' },
+                        { label: 'Aktif', value: summary.active, icon: ShieldCheck, accent: 'var(--brand)' },
+                        { label: 'Cafe', value: summary.cafe, icon: Store, accent: 'var(--brand)' },
+                        { label: 'Stockist', value: summary.stockist, icon: Database, accent: 'var(--brand)' },
+                    ].map(item => <article key={item.label} style={{ border: '1px solid var(--border-soft)', borderRadius: 14, padding: 17, background: '#fff', boxShadow: '0 2px 8px var(--text-900)08' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-500)', fontSize: 13 }}>{item.label}<item.icon size={18} color={item.accent} /></div>
+                        <strong style={{ display: 'block', marginTop: 12, fontSize: 29 }}>{loading ? '—' : Number(item.value || 0).toLocaleString('id-ID')}</strong>
+                    </article>)}
+                </section>
+
+                <section style={{ marginTop: 22, border: '1px solid var(--border-soft)', borderRadius: 15, background: '#fff', overflow: 'hidden', boxShadow: '0 4px 14px var(--text-900)08' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 18, borderBottom: '1px solid var(--border-soft)' }}>
+                        <div><h2 style={{ margin: 0, fontSize: 18 }}>Akun bisnis</h2><p style={{ margin: '4px 0 0', color: 'var(--text-500)', fontSize: 13 }}>Setiap bisnis memiliki database sendiri dan Admin pertamanya.</p></div>
+                        <button onClick={() => setShowForm(value => !value)} disabled={!setup.provisioningConfigured} style={{ border: 0, borderRadius: 9, padding: '10px 14px', color: '#fff', background: setup.provisioningConfigured ? 'var(--brand)' : '#94a3b8', fontWeight: 700, cursor: setup.provisioningConfigured ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>{showForm ? 'Tutup' : '+ Buat bisnis'}</button>
+                    </div>
+
+                    {lastCredential && <div style={{ margin: 16, padding: 15, borderRadius: 11, background: '#ecfdf5', border: '1px solid #bbf7d0' }}>
+                        <strong>Akun Admin pertama untuk {lastCredential.business}</strong>
+                        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 14 }}>
+                            <span>Username: <b>{lastCredential.username}</b></span>
+                            <span>Password: <b>{showPassword ? lastCredential.password : '••••••••••'}</b> <button onClick={() => setShowPassword(value => !value)} style={{ marginLeft: 5, border: 0, color: '#047857', background: 'transparent', textDecoration: 'underline', cursor: 'pointer' }}>{showPassword ? 'Sembunyikan' : 'Tampilkan'}</button></span>
+                        </div>
+                        <p style={{ margin: '7px 0 0', fontSize: 12, color: '#166534' }}>Simpan sekarang dan berikan kredensial ini kepada Admin bisnis. Password tidak dapat ditampilkan lagi setelah halaman ditutup.</p>
+                    </div>}
+
+                    {showForm && <form onSubmit={createBusiness} style={{ margin: 16, padding: 18, borderRadius: 12, background: 'var(--bg-raised)', border: '1px solid var(--border-soft)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 13 }}>
+                        <label style={{ fontSize: 13, fontWeight: 700 }}>Nama bisnis<input required value={form.name} onChange={e => changeName(e.target.value)} style={inputStyle} placeholder="Contoh: Toko Sumber Rejeki" /></label>
+                        <label style={{ fontSize: 13, fontWeight: 700 }}>Kode bisnis<input required value={form.slug} onChange={e => setForm(current => ({ ...current, slug: e.target.value.toLowerCase() }))} style={inputStyle} placeholder="toko-sumber-rejeki" /></label>
+                        <label style={{ fontSize: 13, fontWeight: 700 }}>Jenis usaha<select value={form.businessType} onChange={e => setForm(current => ({ ...current, businessType: e.target.value }))} style={inputStyle}><option value="stockist">Stockist</option><option value="cafe">Cafe / restoran</option></select></label>
+                        <label style={{ fontSize: 13, fontWeight: 700 }}>Username Admin<input required value={form.adminUsername} onChange={e => setForm(current => ({ ...current, adminUsername: e.target.value }))} style={inputStyle} autoComplete="off" /></label>
+                        <label style={{ fontSize: 13, fontWeight: 700 }}>Password awal Admin<input required type="password" minLength={10} value={form.adminPassword} onChange={e => setForm(current => ({ ...current, adminPassword: e.target.value }))} style={inputStyle} autoComplete="new-password" /></label>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <span style={{ color: 'var(--text-500)', fontSize: 12 }}>Password ditentukan Superadmin dan hanya ditampilkan sekali setelah dibuat.</span>
+                            <button disabled={saving} style={{ border: 0, borderRadius: 9, padding: '11px 18px', color: '#fff', background: 'var(--brand)', fontWeight: 700 }}>{saving ? 'Membuat database…' : 'Buat bisnis & Admin'}</button>
+                        </div>
+                    </form>}
+
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760, textAlign: 'left' }}>
+                            <thead style={{ color: 'var(--text-500)', fontSize: 12, background: 'var(--bg-raised)' }}><tr>{['Bisnis', 'Jenis', 'Admin', 'Kasir', 'Database', 'Koneksi', 'Status', 'Aksi'].map(header => <th key={header} style={{ padding: '12px 14px', fontWeight: 700 }}>{header}</th>)}</tr></thead>
+                            <tbody>
+                                {businesses.map(business => <tr key={business.id} style={{ borderTop: '1px solid var(--border-soft)' }}>
+                                    <td data-label="Bisnis" style={{ padding: '14px', fontWeight: 700 }}>{business.name}<small style={{ display: 'block', marginTop: 3, color: 'var(--text-500)', fontWeight: 400 }}>{business.slug}</small></td>
+                                    <td data-label="Jenis" style={{ padding: '14px' }}>{business.business_type === 'stockist' ? 'Stockist' : 'Cafe'}</td>
+                                    <td data-label="Admin" style={{ padding: '14px' }}>{business.admin_username}</td><td data-label="Kasir" style={{ padding: '14px' }}>{business.cashier_count}</td>
+                                    <td data-label="Database" style={{ padding: '14px' }}><code>{business.database_name}</code></td>
+                                    <td data-label="Koneksi" style={{ padding: '14px', color: business.health === 'connected' ? '#15803d' : business.health === 'error' ? '#b91c1c' : 'var(--text-500)' }}>{business.health === 'connected' ? 'Terhubung' : business.health === 'error' ? 'Bermasalah' : business.health === 'suspended' ? 'Ditangguhkan' : '—'}</td>
+                                    <td data-label="Status" style={{ padding: '14px' }}>{business.status === 'active' ? 'Aktif' : 'Ditangguhkan'}</td>
+                                    <td data-label="Aksi" style={{ padding: '14px' }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button onClick={() => void openAccountManager(business)} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>Kelola akun</button><button onClick={() => void toggleStatus(business)} style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>{business.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}</button></div></td>
+                                </tr>)}
+                                {!loading && !businesses.length && <tr className="superadmin-empty-row"><td colSpan={8} style={{ padding: 28, textAlign: 'center', color: 'var(--text-500)' }}>{setup.configured ? 'Belum ada akun bisnis. Buat akun bisnis pertama.' : 'Hubungkan database platform untuk memuat daftar bisnis.'}</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                {managedBusiness && <div role="presentation" onClick={() => setManagedBusiness(null)} style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: 16, background: 'var(--text-900)88' }}>
+                    <section role="dialog" aria-modal="true" aria-labelledby="business-accounts-title" onClick={event => event.stopPropagation()} style={{ width: 'min(100%, 760px)', maxHeight: '90vh', overflowY: 'auto', padding: 20, borderRadius: 14, background: '#fff', boxShadow: '0 20px 60px var(--text-900)44' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+                            <div><h2 id="business-accounts-title" style={{ margin: '0 0 4px' }}>Akun {managedBusiness.name}</h2><p style={{ margin: 0, color: 'var(--text-500)', fontSize: 13 }}>Atur ulang username dan password Admin atau Kasir. Password lama tidak dapat dilihat.</p></div>
+                            <button type="button" onClick={() => setManagedBusiness(null)} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 11px', background: '#fff', cursor: 'pointer' }}>Tutup</button>
+                        </div>
+                        <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+                            {managedAccounts.map(account => <form key={account.id} onSubmit={event => { event.preventDefault(); void saveAccount(account); }} className="superadmin-account-form">
+                                <strong style={{ paddingBottom: 10 }}>{account.role}</strong>
+                                <label style={{ fontSize: 12, fontWeight: 700 }}>Username<input required minLength={3} maxLength={40} value={accountDrafts[account.id]?.username || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), username: event.target.value } }))} style={inputStyle} /></label>
+                                <label style={{ fontSize: 12, fontWeight: 700 }}>Password baru<input required type="password" minLength={10} maxLength={128} autoComplete="new-password" value={accountDrafts[account.id]?.password || ''} onChange={event => setAccountDrafts(current => ({ ...current, [account.id]: { ...(current[account.id] || { username: account.username, password: '' }), password: event.target.value } }))} style={inputStyle} placeholder="Minimal 10 karakter" /></label>
+                                <button disabled={saving} style={{ border: 0, borderRadius: 8, padding: '11px 12px', color: '#fff', background: '#0f766e', fontWeight: 700, cursor: 'pointer' }}>{saving ? 'Menyimpan…' : 'Reset login'}</button>
+                            </form>)}
+                            {!managedAccounts.length && <p style={{ padding: 18, textAlign: 'center', color: 'var(--text-500)' }}>Tidak ada akun bisnis.</p>}
+                        </div>
+                    </section>
+                </div>}
+                <footer style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 14, color: 'var(--text-500)', fontSize: 12 }}><Users size={14} /> Superadmin hanya mengelola akun, status, dan koneksi database.</footer>
+            </div>
+        </main>
+    );
+}

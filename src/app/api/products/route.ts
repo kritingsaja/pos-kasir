@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { kode_barang, nama_barang, harga_jual, diskon, tipe_diskon, kategori, stok } = body;
+        const { kode_barang, nama_barang, harga_jual, harga_beli, diskon, tipe_diskon, kategori, stok } = body;
 
         if (!kode_barang || !nama_barang || harga_jual === undefined) {
             return NextResponse.json(
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
             );
         }
 
-        await addProduct({ kode_barang, nama_barang, harga_jual, diskon, tipe_diskon, kategori, stok });
+        await addProduct({ kode_barang, nama_barang, harga_jual, harga_beli, diskon, tipe_diskon, kategori, stok });
         return NextResponse.json({ success: true, message: 'Produk berhasil ditambahkan' });
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -50,6 +50,9 @@ export async function PUT(request: Request) {
     try {
         const body = await request.json();
         const { id, ...updates } = body;
+        if (updates.harga_beli !== undefined && (!Number.isFinite(Number(updates.harga_beli)) || Number(updates.harga_beli) < 0)) {
+            return NextResponse.json({ success: false, error: 'Harga beli/modal harus berupa angka nol atau lebih' }, { status: 400 });
+        }
 
         if (!id) {
             return NextResponse.json({ success: false, error: 'ID produk wajib diisi' }, { status: 400 });
