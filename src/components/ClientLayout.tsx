@@ -75,7 +75,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     if (isLoginPage) {
         return (
-            <main className="main-content" style={{ margin: 0, padding: 0 }}>
+            <main className="main-content" style={{ margin: 0, padding: 0, width: '100%', minHeight: '100vh' }}>
                 {children}
             </main>
         );
