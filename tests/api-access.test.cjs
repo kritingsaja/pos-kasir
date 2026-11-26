@@ -42,7 +42,7 @@ test('scoped API keys and external orders against a real libsql database', async
     await db.batch([
         'CREATE TABLE products (kode_barang TEXT PRIMARY KEY,nama_barang TEXT,harga_jual INTEGER,diskon INTEGER,tipe_diskon INTEGER,kategori TEXT,aktif INTEGER)',
         'CREATE TABLE settings (key TEXT PRIMARY KEY,value TEXT)',
-        'CREATE TABLE drafts (id INTEGER PRIMARY KEY AUTOINCREMENT,nama_draft TEXT,items TEXT,subtotal INTEGER,diskon_total INTEGER,total INTEGER,created_at TEXT DEFAULT CURRENT_TIMESTAMP)',
+        'CREATE TABLE drafts (id INTEGER PRIMARY KEY AUTOINCREMENT,nama_draft TEXT,items TEXT,subtotal INTEGER,diskon_total INTEGER,total INTEGER,created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP)',
         'CREATE TABLE transactions (id TEXT PRIMARY KEY,tanggal TEXT,waktu TEXT,total INTEGER,metode_bayar TEXT,nama_pelanggan TEXT,items TEXT)',
         "INSERT INTO products VALUES ('TEA','Lemon Tea',15000,1000,1,'Minuman',1),('OFF','Nonaktif',10000,0,1,'Minuman',0)",
     ], 'write');
@@ -58,6 +58,9 @@ test('scoped API keys and external orders against a real libsql database', async
     }
     function external(path, token, body, id = 'order-test-0001') {
         return new Request(`http://localhost/api/v1/${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Idempotency-Key': id }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    }
+    function externalPut(path, token, body, id = 'order-test-0001') {
+        return new Request(`http://localhost/api/v1/${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Idempotency-Key': id }, body: JSON.stringify(body) });
     }
     let menuKey, orderKey;
     await t.test('admin-only management and scoped secrets stored as hashes', async () => {
@@ -104,6 +107,25 @@ test('scoped API keys and external orders against a real libsql database', async
         const items = JSON.parse((await db.execute('SELECT items FROM drafts')).rows[0].items);
         assert.equal(items[0].catatan, 'Less sugar'); assert.equal(items[0].harga_jual, 15000);
         assert.equal((await orders.POST(external('orders', orderKey.token, { ...body, nama_pelanggan: 'Different' }))).status, 409);
+    });
+    await t.test('PUT replaces the existing reservation draft instead of creating a second draft', async () => {
+        const original = (await db.execute('SELECT id FROM drafts LIMIT 1')).rows[0];
+        assert.ok(original);
+        const changed = { nama_pelanggan: 'Meja 5', items: [{ kode_barang: 'TEA', qty: 3, catatan: 'Extra ice' }] };
+        const response = await orders.PUT(externalPut('orders', orderKey.token, changed));
+        assert.equal(response.status, 200);
+        const result = (await response.json()).data;
+        assert.equal(result.updated, true);
+        assert.equal(result.draft_id, Number(original.id));
+        const saved = (await db.execute({ sql: 'SELECT items FROM drafts WHERE id = ?', args: [original.id] })).rows[0];
+        const savedItems = JSON.parse(saved.items);
+        assert.equal(savedItems.length, 1);
+        assert.equal(savedItems[0].qty, 3);
+        assert.equal(savedItems[0].catatan, 'Extra ice');
+        assert.equal((await db.execute('SELECT COUNT(*) AS n FROM drafts')).rows[0].n, 1);
+        const retry = await orders.PUT(externalPut('orders', orderKey.token, changed));
+        assert.equal(retry.status, 200);
+        assert.equal((await retry.json()).data.duplicate, true);
     });
     await t.test('unavailable menus and malformed orders roll back, next-day availability resets', async () => {
         await db.batch([
