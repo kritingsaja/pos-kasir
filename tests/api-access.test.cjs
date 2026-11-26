@@ -111,13 +111,14 @@ test('scoped API keys and external orders against a real libsql database', async
     await t.test('PUT replaces the existing reservation draft instead of creating a second draft', async () => {
         const original = (await db.execute('SELECT id FROM drafts LIMIT 1')).rows[0];
         assert.ok(original);
-        const changed = { nama_pelanggan: 'Meja 5', items: [{ kode_barang: 'TEA', qty: 3, catatan: 'Extra ice' }] };
+        const changed = { source: 'booking', nama_pelanggan: 'ASDSA · 10/02 · INDOOR-SOFA · ADD70A22', items: [{ kode_barang: 'TEA', qty: 3, catatan: 'Extra ice' }] };
         const response = await orders.PUT(externalPut('orders', orderKey.token, changed));
         assert.equal(response.status, 200);
         const result = (await response.json()).data;
         assert.equal(result.updated, true);
         assert.equal(result.draft_id, Number(original.id));
-        const saved = (await db.execute({ sql: 'SELECT items FROM drafts WHERE id = ?', args: [original.id] })).rows[0];
+        const saved = (await db.execute({ sql: 'SELECT nama_draft,items FROM drafts WHERE id = ?', args: [original.id] })).rows[0];
+        assert.equal(saved.nama_draft, 'BOOKING - ASDSA · 10/02 · INDOOR-SOFA · ADD70A22');
         const savedItems = JSON.parse(saved.items);
         assert.equal(savedItems.length, 1);
         assert.equal(savedItems[0].qty, 3);
