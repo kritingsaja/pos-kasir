@@ -57,6 +57,14 @@ Buka menu Draft di kasir untuk mengambil daftar terbaru dan melanjutkan pembayar
 Cash/QRIS seperti biasa. API tidak memberikan akses riwayat penjualan dan tidak
 menandai pembayaran lunas.
 
+Untuk mengganti isi draft reservasi yang sama (misalnya pelanggan menambah atau
+mengubah pilihan menu), gunakan `PUT /api/v1/orders` dengan API key dan
+`Idempotency-Key` yang sama. Isi draft pada kasir akan **ditimpa** dengan daftar
+menu terbaru, tetapi `draft_id` tetap sama sehingga tidak membuat draft ganda.
+Jika draft sebelumnya sudah tidak ada di kasir, API mengembalikan `409` dan
+tidak membuat draft duplikat. `POST` tetap menggunakan perilaku idempotensi
+ketat: kunci yang sama dengan payload berbeda ditolak.
+
 Simpan Idempotency-Key unik untuk setiap pesanan, 8-100 karakter `[a-zA-Z0-9._:-]`.
 Saat timeout/retry, gunakan key dan payload yang sama: response 200, duplicate true,
 draft_id tetap, tidak menambah draft. Key sama dengan payload berbeda menghasilkan
