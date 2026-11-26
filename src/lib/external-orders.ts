@@ -20,19 +20,20 @@ export function validateOrder(body: Record<string, unknown>) {
     return { name, items };
 }
 
-export async function createExternalOrder(keyId: string, requestId: string, body: Record<string, unknown>) {
+export async function createExternalOrder(keyId: string, requestId: string, body: Record<string, unknown>, replaceExisting = false) {
     if (!/^[a-zA-Z0-9._:-]{8,100}$/.test(requestId)) throw new ApiError(400, 'Idempotency-Key wajib berisi 8-100 karakter huruf, angka, titik, titik dua, garis bawah, atau tanda hubung.');
     const order = validateOrder(body);
     const hash = tokenHash(JSON.stringify(order));
     const tx = await getDb().transaction('write');
     try {
         const previous = await tx.execute({ sql: 'SELECT * FROM integration_orders WHERE key_id = ? AND request_id = ?', args: [keyId, requestId] });
-        if (previous.rows[0]) {
-            const row = previous.rows[0];
-            if (row.payload_hash !== hash) throw new ApiError(409, 'Idempotency-Key sudah digunakan untuk pesanan berbeda.');
+        const previousRow = previous.rows[0];
+        if (previousRow && (!replaceExisting || previousRow.payload_hash === hash)) {
+            if (previousRow.payload_hash !== hash) throw new ApiError(409, 'Idempotency-Key sudah digunakan untuk pesanan berbeda.');
             await tx.commit();
-            return { draft_id: Number(row.draft_id), total: Number(row.total), duplicate: true };
+            return { draft_id: Number(previousRow.draft_id), total: Number(previousRow.total), duplicate: true };
         }
+
         const settings = await tx.execute("SELECT key,value FROM settings WHERE key IN ('daily_unavailable_menu_date','daily_unavailable_menu_codes')");
         const values = Object.fromEntries(settings.rows.map(row => [String(row.key), String(row.value)]));
         const unavailable: string[] = values.daily_unavailable_menu_date === jakartaDate() ? JSON.parse(values.daily_unavailable_menu_codes || '[]') : [];
@@ -50,11 +51,27 @@ export async function createExternalOrder(keyId: string, requestId: string, body
         });
         const subtotal = items.reduce((sum, item) => sum + item.harga_jual * item.qty, 0);
         const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+        if (previousRow && replaceExisting) {
+            const draftId = Number(previousRow.draft_id);
+            const updated = await tx.execute({
+                sql: "UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+                args: [`API - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, draftId],
+            });
+            if (!updated.rowsAffected) throw new ApiError(409, 'Draft sebelumnya sudah tidak tersedia di kasir. Buat draft baru melalui admin.');
+            await tx.execute({
+                sql: 'UPDATE integration_orders SET payload_hash = ?, total = ? WHERE key_id = ? AND request_id = ?',
+                args: [hash, total, keyId, requestId],
+            });
+            await tx.commit();
+            return { draft_id: draftId, total, duplicate: false, updated: true };
+        }
+
         const created = await tx.execute({ sql: 'INSERT INTO drafts (nama_draft,items,subtotal,diskon_total,total) VALUES (?,?,?,?,?)', args: [`API - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total] });
         const draftId = Number(created.lastInsertRowid);
         await tx.execute({ sql: 'INSERT INTO integration_orders (key_id,request_id,payload_hash,draft_id,total,created_at) VALUES (?,?,?,?,?,?)', args: [keyId, requestId, hash, draftId, total, Date.now()] });
         await tx.commit();
-        return { draft_id: draftId, total, duplicate: false };
+        return { draft_id: draftId, total, duplicate: false, updated: false };
     } catch (error) { await tx.rollback(); throw error; }
     finally { tx.close(); }
 }
