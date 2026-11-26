@@ -35,7 +35,8 @@ Content-Type: application/json
 Idempotency-Key: order-mitra-000001
 
 {
-  "nama_pelanggan": "Meja 5",
+  "source": "booking",
+  "nama_pelanggan": "ASDSA · 10/02 · INDOOR-SOFA · ADD70A22",
   "items": [
     { "kode_barang": "KODE_DARI_API_MENU", "qty": 2, "catatan": "Less sugar" }
   ]
@@ -52,7 +53,10 @@ Response baru (201):
 {"success":true,"data":{"draft_id":123,"total":28000,"duplicate":false,"status":"pending_payment"}}
 ```
 
-Pesanan masuk draft kasir dengan nama `API - Meja 5`, bukan transaksi lunas.
+Jika `source` bernilai `booking`, draft menggunakan prefix `BOOKING -`. Nama
+pelanggan berisi ringkasan reservasi: nama pelanggan, tanggal kunjungan,
+zona/lokasi meja, dan 8 karakter terakhir kode booking. Tanpa `source` atau
+dengan nilai `api`, prefix tetap `API -`. Pesanan bukan transaksi lunas.
 Buka menu Draft di kasir untuk mengambil daftar terbaru dan melanjutkan pembayaran
 Cash/QRIS seperti biasa. API tidak memberikan akses riwayat penjualan dan tidak
 menandai pembayaran lunas.
