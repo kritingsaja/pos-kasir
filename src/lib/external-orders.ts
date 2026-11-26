@@ -17,7 +17,9 @@ export function validateOrder(body: Record<string, unknown>) {
         if (row.catatan !== undefined && (typeof row.catatan !== 'string' || row.catatan.length > 300)) throw new ApiError(400, 'Catatan maksimal 300 karakter.');
         return { kode_barang: code, qty: row.qty, catatan: String(row.catatan || '').trim() };
     });
-    return { name, items };
+    const source = body.source === undefined ? 'api' : body.source;
+    if (source !== 'api' && source !== 'booking') throw new ApiError(400, 'Sumber pesanan tidak valid.');
+    return { name, source, items };
 }
 
 export async function createExternalOrder(keyId: string, requestId: string, body: Record<string, unknown>, replaceExisting = false) {
@@ -56,7 +58,7 @@ export async function createExternalOrder(keyId: string, requestId: string, body
             const draftId = Number(previousRow.draft_id);
             const updated = await tx.execute({
                 sql: "UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, updated_at = datetime('now','localtime') WHERE id = ?",
-                args: [`API - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, draftId],
+                args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, draftId],
             });
             if (!updated.rowsAffected) throw new ApiError(409, 'Draft sebelumnya sudah tidak tersedia di kasir. Buat draft baru melalui admin.');
             await tx.execute({
@@ -67,7 +69,7 @@ export async function createExternalOrder(keyId: string, requestId: string, body
             return { draft_id: draftId, total, duplicate: false, updated: true };
         }
 
-        const created = await tx.execute({ sql: 'INSERT INTO drafts (nama_draft,items,subtotal,diskon_total,total) VALUES (?,?,?,?,?)', args: [`API - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total] });
+        const created = await tx.execute({ sql: 'INSERT INTO drafts (nama_draft,items,subtotal,diskon_total,total) VALUES (?,?,?,?,?)', args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total] });
         const draftId = Number(created.lastInsertRowid);
         await tx.execute({ sql: 'INSERT INTO integration_orders (key_id,request_id,payload_hash,draft_id,total,created_at) VALUES (?,?,?,?,?,?)', args: [keyId, requestId, hash, draftId, total, Date.now()] });
         await tx.commit();
