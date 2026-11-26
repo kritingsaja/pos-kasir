@@ -25,7 +25,9 @@ export function validateOrder(body: Record<string, unknown>) {
 export async function createExternalOrder(keyId: string, requestId: string, body: Record<string, unknown>, replaceExisting = false) {
     if (!/^[a-zA-Z0-9._:-]{8,100}$/.test(requestId)) throw new ApiError(400, 'Idempotency-Key wajib berisi 8-100 karakter huruf, angka, titik, titik dua, garis bawah, atau tanda hubung.');
     const order = validateOrder(body);
-    const hash = tokenHash(JSON.stringify(order));
+    // Keep legacy idempotency hashes for ordinary API orders; booking source is part of its own payload identity.
+    const hashPayload = order.source === 'booking' ? order : { name: order.name, items: order.items };
+    const hash = tokenHash(JSON.stringify(hashPayload));
     const tx = await getDb().transaction('write');
     try {
         const previous = await tx.execute({ sql: 'SELECT * FROM integration_orders WHERE key_id = ? AND request_id = ?', args: [keyId, requestId] });
