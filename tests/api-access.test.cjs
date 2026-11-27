@@ -176,8 +176,8 @@ test('scoped API keys and external orders against a real libsql database', async
     await t.test('dashboard totals exclude drafts and separate cash/QRIS', async () => {
         const date = access.jakartaDate();
         await db.batch([
-            { sql: 'INSERT INTO transactions VALUES (?,?,?,?,?,?,?)', args: ['CASH', date, '10:00:00', 28000, 'tunai', 'Meja 1', JSON.stringify([{ kode_barang: 'TEA', nama_barang: 'Lemon Tea', qty: 2, subtotal: 28000 }])] },
-            { sql: 'INSERT INTO transactions VALUES (?,?,?,?,?,?,?)', args: ['QRIS', date, '11.00.00', 14000, 'qris', '', JSON.stringify([{ kode_barang: 'TEA', nama_barang: 'Lemon Tea', qty: 1, subtotal: 14000 }])] },
+            { sql: 'INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?)', args: ['CASH', date, '10:00:00', 28000, 'tunai', '', 'Meja 1', JSON.stringify([{ kode_barang: 'TEA', nama_barang: 'Lemon Tea', qty: 2, subtotal: 28000 }])] },
+            { sql: 'INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?)', args: ['QRIS', date, '11.00.00', 14000, 'qris', '', '', JSON.stringify([{ kode_barang: 'TEA', nama_barang: 'Lemon Tea', qty: 1, subtotal: 14000 }])] },
         ]);
         const response = await overview.GET(await admin('GET'));
         assert.equal(response.status, 200);
