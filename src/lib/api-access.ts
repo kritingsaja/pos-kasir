@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { jwtVerify } from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, ensureDb } from '@/lib/db';
 
 export type ApiScope = 'menu' | 'orders';
 export class ApiError extends Error {
@@ -70,6 +70,7 @@ export function newApiKey(scope: ApiScope) {
 export async function requireApiKey(request: Request, scope: ApiScope) {
     const auth = request.headers.get('authorization');
     if (!auth || !/^Bearer pos_(menu|orders)_[a-f0-9]{64}$/.test(auth)) throw new ApiError(401, 'Bearer API key diperlukan.');
+    await ensureDb();
     await ensureApiSchema();
     const db = getDb();
     const found = await db.execute({ sql: 'SELECT id, scope, expires_at, revoked_at FROM integration_keys WHERE token_hash = ?', args: [tokenHash(auth.slice(7))] });
