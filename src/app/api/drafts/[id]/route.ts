@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteDraft, updateDraft } from '@/lib/db';
+import { deleteDraft, updateDraft, normalizeDraftDate } from '@/lib/db';
 
 export async function DELETE(
     request: Request,
@@ -32,6 +32,9 @@ export async function PUT(
 
         const body = await request.json();
         const { nama_draft, items, subtotal, diskon_total, total } = body;
+        let tanggal_pesanan: string;
+        try { tanggal_pesanan = normalizeDraftDate(body.tanggal_pesanan); }
+        catch (error: any) { return NextResponse.json({ success: false, error: error.message }, { status: 400 }); }
 
         const result = await updateDraft(id, {
             nama_draft,
@@ -39,6 +42,7 @@ export async function PUT(
             subtotal,
             diskon_total,
             total,
+            tanggal_pesanan,
         });
 
         return NextResponse.json({ success: true, data: result });
