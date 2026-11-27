@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { deleteDraft, updateDraft, normalizeDraftDate } from '@/lib/db';
+import { deleteDraft, updateDraft, normalizeDraftDate, ensureDb } from '@/lib/db';
 
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        await ensureDb();
         const { id: rawId } = await params;
         const id = parseInt(rawId);
         if (isNaN(id)) {
