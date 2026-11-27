@@ -450,7 +450,7 @@ export function normalizeDraftDate(value: unknown): string {
   const date = value === undefined || value === null || value === ''
     ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
     : value;
-  if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
   const parsed = new Date(`${date}T00:00:00.000Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new Error('Tanggal pesanan tidak valid.');
   return date;
