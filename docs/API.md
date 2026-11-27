@@ -66,14 +66,13 @@ Untuk mengganti isi draft reservasi yang sama (misalnya pelanggan menambah atau
 mengubah pilihan menu), gunakan `PUT /api/v1/orders` dengan API key dan
 `Idempotency-Key` yang sama. Isi draft pada kasir akan **ditimpa** dengan daftar
 menu terbaru, tetapi `draft_id` tetap sama sehingga tidak membuat draft ganda.
-Jika draft sebelumnya sudah tidak ada di kasir, API mengembalikan `409` dan
-tidak membuat draft duplikat. `POST` tetap menggunakan perilaku idempotensi
+Jika draft sebelumnya sudah dihapus dari kasir, API akan membuat draft pengganti dan mengarahkan catatan idempotensi ke ID baru. Pengiriman ulang berikutnya tetap memperbarui draft pengganti yang sama. `POST` tetap menggunakan perilaku idempotensi
 ketat: kunci yang sama dengan payload berbeda ditolak.
 
 Simpan Idempotency-Key unik untuk setiap pesanan, 8-100 karakter `[a-zA-Z0-9._:-]`.
 Saat timeout/retry, gunakan key dan payload yang sama: response 200, duplicate true,
 draft_id tetap, tidak menambah draft. Key sama dengan payload berbeda menghasilkan
-409. Idempotensi terikat API key; jangan mengganti API key pada retry pesanan lama.
+409. Draft menyimpan `tanggal_pesanan` (YYYY-MM-DD); integrasi reservasi mengirim tanggal kunjungan booking, sedangkan request tanpa tanggal menggunakan tanggal hari ini Asia/Jakarta. Idempotensi terikat API key; jangan mengganti API key pada retry pesanan lama.
 Referensi deduplikasi tetap disimpan setelah draft dibayar/dihapus. Response retry
 menggambarkan penerimaan awal, bukan status pembayaran terbaru.
 
