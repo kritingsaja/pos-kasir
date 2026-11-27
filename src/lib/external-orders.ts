@@ -19,7 +19,11 @@ export function validateOrder(body: Record<string, unknown>) {
     });
     const source = body.source === undefined ? 'api' : body.source;
     if (source !== 'api' && source !== 'booking') throw new ApiError(400, 'Sumber pesanan tidak valid.');
-    return { name, source, items };
+    const tanggal_pesanan = body.tanggal_pesanan === undefined ? jakartaDate() : body.tanggal_pesanan;
+    if (typeof tanggal_pesanan !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(tanggal_pesanan)) throw new ApiError(400, 'Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
+    const parsedDate = new Date(`${tanggal_pesanan}T00:00:00.000Z`);
+    if (!Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== tanggal_pesanan) throw new ApiError(400, 'Tanggal pesanan tidak valid.');
+    return { name, source, items, tanggal_pesanan };
 }
 
 export async function createExternalOrder(keyId: string, requestId: string, body: Record<string, unknown>, replaceExisting = false) {
@@ -68,8 +72,8 @@ export async function createExternalOrder(keyId: string, requestId: string, body
         if (previousRow && replaceExisting && previousDraftExists) {
             const draftId = Number(previousRow.draft_id);
             await tx.execute({
-                sql: "UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, updated_at = datetime('now','localtime') WHERE id = ?",
-                args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, draftId],
+                sql: "UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, tanggal_pesanan = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+                args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, order.tanggal_pesanan, draftId],
             });
             await tx.execute({
                 sql: 'UPDATE integration_orders SET payload_hash = ?, total = ? WHERE key_id = ? AND request_id = ?',
@@ -79,7 +83,7 @@ export async function createExternalOrder(keyId: string, requestId: string, body
             return { draft_id: draftId, total, duplicate: false, updated: true };
         }
 
-        const created = await tx.execute({ sql: 'INSERT INTO drafts (nama_draft,items,subtotal,diskon_total,total) VALUES (?,?,?,?,?)', args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total] });
+        const created = await tx.execute({ sql: 'INSERT INTO drafts (nama_draft,items,subtotal,diskon_total,total,tanggal_pesanan) VALUES (?,?,?,?,?,?)', args: [`${order.source === 'booking' ? 'BOOKING' : 'API'} - ${order.name}`, JSON.stringify(items), subtotal, subtotal - total, total, order.tanggal_pesanan] });
         const draftId = Number(created.lastInsertRowid);
         if (previousRow && replaceExisting) {
             // A deleted POS draft leaves its idempotency record behind. Repoint that same booking key to the replacement.
