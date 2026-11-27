@@ -127,6 +127,22 @@ test('scoped API keys and external orders against a real libsql database', async
         const retry = await orders.PUT(externalPut('orders', orderKey.token, changed));
         assert.equal(retry.status, 200);
         assert.equal((await retry.json()).data.duplicate, true);
+
+        // Admin resend must rebuild the POS draft when a cashier has deleted it,
+        // while reusing the original reservation idempotency key.
+        await db.execute({ sql: 'DELETE FROM drafts WHERE id = ?', args: [original.id] });
+        const recreatedResponse = await orders.PUT(externalPut('orders', orderKey.token, changed));
+        assert.equal(recreatedResponse.status, 201);
+        const recreated = (await recreatedResponse.json()).data;
+        assert.equal(recreated.recreated, true);
+        assert.notEqual(recreated.draft_id, Number(original.id));
+        const mapping = (await db.execute('SELECT draft_id FROM integration_orders WHERE key_id = ? AND request_id = ?', [orderKey.id, 'order-test-0001'])).rows[0];
+        assert.equal(Number(mapping.draft_id), recreated.draft_id);
+        assert.equal((await db.execute('SELECT COUNT(*) AS n FROM drafts')).rows[0].n, 1);
+        const recreateRetry = await orders.PUT(externalPut('orders', orderKey.token, changed));
+        assert.equal(recreateRetry.status, 200);
+        assert.equal((await recreateRetry.json()).data.duplicate, true);
+        assert.equal((await db.execute('SELECT COUNT(*) AS n FROM drafts')).rows[0].n, 1);
     });
     await t.test('unavailable menus and malformed orders roll back, next-day availability resets', async () => {
         await db.batch([
