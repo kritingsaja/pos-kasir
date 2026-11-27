@@ -25,6 +25,7 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        await ensureDb();
         const { id: rawId } = await params;
         const id = parseInt(rawId);
         if (isNaN(id)) {
