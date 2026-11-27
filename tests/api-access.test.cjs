@@ -19,7 +19,7 @@ function loader(db) {
         const source = readFileSync(resolve(__dirname, '..', file), 'utf8');
         const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } });
         vm.runInNewContext(outputText, {
-            exports, require: name => name === '@/lib/db' ? { getDb: () => db } : name.startsWith('@/') ? load(`src/${name.slice(2)}.ts`) : require(name),
+            exports, require: name => name === '@/lib/db' ? { getDb: () => db, ensureDb: async () => undefined } : name.startsWith('@/') ? load(`src/${name.slice(2)}.ts`) : require(name),
             process: { env: { JWT_SECRET: secret } }, console, TextEncoder, TextDecoder, Request, Response, Headers, URL,
         }, { filename: file });
         return exports;
@@ -97,6 +97,8 @@ test('scoped API keys and external orders against a real libsql database', async
         assert.equal(response.status, 201);
         const data = (await response.json()).data;
         assert.equal(data.total, 28000); assert.equal(data.status, 'pending_payment');
+        const newDraft = (await db.execute('SELECT tanggal_pesanan FROM drafts LIMIT 1')).rows[0];
+        assert.equal(newDraft.tanggal_pesanan, access.jakartaDate());
         for (let i = 0; i < 3; i++) {
             const retry = await orders.POST(external('orders', orderKey.token, body));
             assert.equal(retry.status, 200);
@@ -136,6 +138,8 @@ test('scoped API keys and external orders against a real libsql database', async
         assert.equal(recreatedResponse.status, 201);
         const recreated = (await recreatedResponse.json()).data;
         assert.equal(recreated.recreated, true);
+        const recreatedDraft = (await db.execute({ sql: 'SELECT tanggal_pesanan FROM drafts WHERE id = ?', args: [recreated.draft_id] })).rows[0];
+        assert.equal(recreatedDraft.tanggal_pesanan, '2026-02-10');
         assert.notEqual(recreated.draft_id, Number(original.id));
         const mapping = (await db.execute({ sql: 'SELECT draft_id FROM integration_orders WHERE key_id = ? AND request_id = ?', args: [orderKey.id, 'order-test-0001'] })).rows[0];
         assert.equal(Number(mapping.draft_id), recreated.draft_id);
