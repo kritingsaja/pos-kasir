@@ -36,6 +36,7 @@ Idempotency-Key: order-mitra-000001
 
 {
   "source": "booking",
+  "tanggal_pesanan": "2026-02-10",
   "nama_pelanggan": "ASDSA · 10/02 · INDOOR-SOFA · ADD70A22",
   "items": [
     { "kode_barang": "KODE_DARI_API_MENU", "qty": 2, "catatan": "Less sugar" }
@@ -43,7 +44,7 @@ Idempotency-Key: order-mitra-000001
 }
 ```
 
-Nama wajib 1-80 karakter, 1-50 menu berbeda, qty integer 1-100/menu,
+`tanggal_pesanan` wajib YYYY-MM-DD (jika tidak dikirim, tanggal hari ini Asia/Jakarta). Nama wajib 1-80 karakter, 1-50 menu berbeda, qty integer 1-100/menu,
 catatan opsional maksimal 300 karakter. Harga, diskon dan total dihitung server;
 harga dari aplikasi pemanggil diabaikan. Menu nonaktif/kosong ditolak.
 
@@ -53,7 +54,7 @@ Response baru (201):
 {"success":true,"data":{"draft_id":123,"total":28000,"duplicate":false,"status":"pending_payment"}}
 ```
 
-Jika `source` bernilai `booking`, draft menggunakan prefix `BOOKING -`. Nama
+Jika `source` bernilai `booking`, draft menggunakan prefix `BOOKING -` dan tanggal pesanan mengikuti `tanggal_pesanan` (tanggal kunjungan booking). Nama
 pelanggan berisi ringkasan reservasi: nama pelanggan, tanggal kunjungan,
 zona/lokasi meja, dan 8 karakter terakhir kode booking. Tanpa `source` atau
 dengan nilai `api`, prefix tetap `API -`. Pesanan bukan transaksi lunas.
