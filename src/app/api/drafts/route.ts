@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getAllDrafts, addDraft, normalizeDraftDate } from '@/lib/db';
+import { getAllDrafts, addDraft, normalizeDraftDate, ensureDb } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
+        await ensureDb();
         const drafts = await getAllDrafts();
         return NextResponse.json({ success: true, data: drafts });
     } catch (error: any) {
@@ -14,6 +15,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
+        await ensureDb();
         const body = await request.json();
         const { nama_draft, items, subtotal, diskon_total, total } = body;
         let tanggal_pesanan: string;
