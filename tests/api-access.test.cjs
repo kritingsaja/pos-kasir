@@ -43,7 +43,7 @@ test('scoped API keys and external orders against a real libsql database', async
         'CREATE TABLE products (kode_barang TEXT PRIMARY KEY,nama_barang TEXT,harga_jual INTEGER,diskon INTEGER,tipe_diskon INTEGER,kategori TEXT,aktif INTEGER)',
         'CREATE TABLE settings (key TEXT PRIMARY KEY,value TEXT)',
         'CREATE TABLE drafts (id INTEGER PRIMARY KEY AUTOINCREMENT,nama_draft TEXT,items TEXT,subtotal INTEGER,diskon_total INTEGER,total INTEGER,tanggal_pesanan TEXT NOT NULL DEFAULT \'\',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP)',
-        'CREATE TABLE transactions (id TEXT PRIMARY KEY,tanggal TEXT,waktu TEXT,total INTEGER,metode_bayar TEXT,nama_pelanggan TEXT,items TEXT)',
+        'CREATE TABLE transactions (id TEXT PRIMARY KEY,tanggal TEXT,waktu TEXT,total INTEGER,metode_bayar TEXT,rincian_bayar TEXT NOT NULL DEFAULT '',nama_pelanggan TEXT,items TEXT)',
         "INSERT INTO products VALUES ('TEA','Lemon Tea',15000,1000,1,'Minuman',1),('OFF','Nonaktif',10000,0,1,'Minuman',0)",
     ], 'write');
     const load = loader(db);
