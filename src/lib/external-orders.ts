@@ -20,7 +20,7 @@ export function validateOrder(body: Record<string, unknown>) {
     const source = body.source === undefined ? 'api' : body.source;
     if (source !== 'api' && source !== 'booking') throw new ApiError(400, 'Sumber pesanan tidak valid.');
     const tanggal_pesanan = body.tanggal_pesanan === undefined ? jakartaDate() : body.tanggal_pesanan;
-    if (typeof tanggal_pesanan !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(tanggal_pesanan)) throw new ApiError(400, 'Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
+    if (typeof tanggal_pesanan !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pesanan)) throw new ApiError(400, 'Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
     const parsedDate = new Date(`${tanggal_pesanan}T00:00:00.000Z`);
     if (!Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== tanggal_pesanan) throw new ApiError(400, 'Tanggal pesanan tidak valid.');
     return { name, source, items, tanggal_pesanan };
