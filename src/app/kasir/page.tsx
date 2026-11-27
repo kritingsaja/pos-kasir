@@ -39,6 +39,7 @@ export default function KasirPage() {
         diskon_total: number;
         total: number;
         created_at: string;
+        tanggal_pesanan: string;
     };
     const [lastTransaction, setLastTransaction] = useState<{
         id: string;
@@ -59,6 +60,8 @@ export default function KasirPage() {
     const [loadedDraftId, setLoadedDraftId] = useState<number | null>(null);
     const [showSaveDraftModal, setShowSaveDraftModal] = useState(false);
     const [draftNameInput, setDraftNameInput] = useState('');
+    const [draftDateInput, setDraftDateInput] = useState(getTodayDate());
+    const [draftDateFilter, setDraftDateFilter] = useState('');
     const [selectedDraftForDetail, setSelectedDraftForDetail] = useState<DraftRow | null>(null);
     const [categories, setCategories] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState('Semua');
@@ -423,6 +426,7 @@ export default function KasirPage() {
         try { sessionStorage.removeItem('kasir-qris-intent'); } catch { /* Storage can be disabled. */ }
         setMetodeBayar('tunai');
         setLoadedDraftId(null);
+        setDraftDateInput(getTodayDate());
         setNamaPelanggan('');
         setEditingItem(null);
         setEditingNote(null);
@@ -530,15 +534,16 @@ export default function KasirPage() {
             showToast('Keranjang masih kosong!', 'error');
             return;
         }
-        
-        // Gunakan nama pelanggan jika sudah ada, atau buat nama default dengan waktu
+
+        if (!loadedDraftId) setDraftDateInput(getTodayDate());
+
         if (namaPelanggan.trim()) {
             setDraftNameInput(namaPelanggan.trim());
         } else {
             const timeString = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             setDraftNameInput(`Draft - ${timeString}`);
         }
-        
+
         setShowSaveDraftModal(true);
     }
 
@@ -556,6 +561,7 @@ export default function KasirPage() {
                     subtotal,
                     diskon_total: diskonTotal,
                     total,
+                    tanggal_pesanan: draftDateInput,
                 }),
             });
             const data = await res.json();
@@ -594,6 +600,7 @@ export default function KasirPage() {
             const items = Array.isArray(parsed) ? (parsed as CartItem[]) : [];
             setCart(items);
             setLoadedDraftId(draft.id);
+            setDraftDateInput(draft.tanggal_pesanan || getTodayDate());
             setNamaPelanggan(draft.nama_draft);
             setShowDraftsList(false);
             setStep('selection');
@@ -616,6 +623,7 @@ export default function KasirPage() {
 
             setCart(items);
             setLoadedDraftId(draft.id);
+            setDraftDateInput(draft.tanggal_pesanan || getTodayDate());
             setNamaPelanggan(draft.nama_draft);
             setGlobalTipeDiskon(1);
             setGlobalDiskon(additionalDiscount > 0 ? String(additionalDiscount) : '');
@@ -820,6 +828,12 @@ export default function KasirPage() {
     };
 
     function parseItems(s: string) { try { return JSON.parse(s); } catch { return []; } }
+    function formatDraftDate(value?: string) {
+        if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return 'Tanggal belum ditentukan';
+        const date = new Date(`${value}T00:00:00`);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    }
+    const visibleDrafts = savedDrafts.filter(draft => !draftDateFilter || draft.tanggal_pesanan === draftDateFilter);
 
     return (
         <>
@@ -1567,38 +1581,42 @@ export default function KasirPage() {
                                     <p>Tidak ada draft tersimpan</p>
                                 </div>
                             ) : !selectedDraftForDetail ? (
-                                <div className="draft-list" style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {savedDrafts.map((draft) => {
-                                        return (
-                                            <div key={draft.id} className="draft-item" 
-                                                onClick={() => setSelectedDraftForDetail(draft)}
-                                                style={{
-                                                    padding: '16px 20px',
-                                                    borderBottom: '1px solid var(--border-soft)',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    background: 'var(--bg-surface)',
-                                                    transition: 'background 0.2s ease'
-                                                }}>
-                                                <div>
-                                                    <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-900)' }}>{draft.nama_draft}</div>
-                                                    <div style={{ color: 'var(--text-500)', fontSize: '12px', marginTop: '2px' }}>
-                                                        {new Date(draft.created_at).toLocaleString('id-ID')}
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'end', gap: '10px', padding: '14px 18px', borderBottom: '1px solid var(--border-soft)', flexWrap: 'wrap' }}>
+                                        <label style={{ display: 'grid', gap: '5px', flex: '1 1 190px', fontSize: '12px', color: 'var(--text-500)', fontWeight: 700 }}>
+                                            Filter tanggal pesanan
+                                            <input type="date" value={draftDateFilter} onChange={e => setDraftDateFilter(e.target.value)} style={{ minHeight: '40px', padding: '8px 10px', border: '1px solid var(--border-soft)', borderRadius: '9px', background: 'var(--bg-surface)', color: 'var(--text-900)' }} />
+                                        </label>
+                                        <button className="btn btn-sm btn-secondary" onClick={() => setDraftDateFilter('')} disabled={!draftDateFilter}>Semua tanggal</button>
+                                    </div>
+                                    {visibleDrafts.length === 0 ? (
+                                        <div className="empty-state" style={{ padding: '36px' }}>
+                                            <p>{draftDateFilter ? `Tidak ada draft untuk tanggal ${formatDraftDate(draftDateFilter)}` : 'Tidak ada draft tersimpan'}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="draft-list" style={{ display: 'flex', flexDirection: 'column' }}>
+                                            {visibleDrafts.map((draft) => (
+                                                <div key={draft.id} className="draft-item"
+                                                    onClick={() => setSelectedDraftForDetail(draft)}
+                                                    style={{ padding: '15px 20px', borderBottom: '1px solid var(--border-soft)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)', transition: 'background 0.2s ease' }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-900)' }}>{draft.nama_draft}</div>
+                                                        <div style={{ color: 'var(--brand)', fontSize: '12px', fontWeight: 700, marginTop: '3px' }}>Tanggal pesanan: {formatDraftDate(draft.tanggal_pesanan)}</div>
+                                                        <div style={{ color: 'var(--text-500)', fontSize: '11px', marginTop: '2px' }}>Dibuat: {new Date(draft.created_at).toLocaleString('id-ID')}</div>
                                                     </div>
+                                                    <span style={{ color: 'var(--text-400)' }}>›</span>
                                                 </div>
-                                                <span style={{ color: 'var(--text-400)' }}>›</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="draft-detail-view" style={{ padding: '20px' }}>
                                     <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border-soft)', paddingBottom: '16px' }}>
                                         <div style={{ fontSize: '14px', color: 'var(--text-500)', marginBottom: '4px' }}>Nama Pesanan:</div>
                                         <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--brand)' }}>{selectedDraftForDetail!.nama_draft}</div>
                                         <div style={{ fontSize: '12px', color: 'var(--text-400)', marginTop: '4px' }}>
+                                            Tanggal pesanan: {formatDraftDate(selectedDraftForDetail!.tanggal_pesanan)}<br />
                                             Dibuat pada: {new Date(selectedDraftForDetail!.created_at).toLocaleString('id-ID')}
                                         </div>
                                     </div>
@@ -1673,6 +1691,11 @@ export default function KasirPage() {
                                         if (e.key === 'Enter') confirmSaveDraft();
                                     }}
                                 />
+                            </div>
+                            <div className="input-group" style={{ marginBottom: '20px' }}>
+                                <label>Tanggal pesanan / kunjungan</label>
+                                <input type="date" value={draftDateInput} onChange={e => setDraftDateInput(e.target.value)} required />
+                                <small style={{ color: 'var(--text-500)', fontSize: '11px' }}>Pilih tanggal layanan atau kunjungan yang terkait dengan draft ini.</small>
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowSaveDraftModal(false)}>
