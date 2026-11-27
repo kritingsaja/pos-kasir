@@ -99,6 +99,7 @@ export async function initializeDatabase(
         subtotal INTEGER NOT NULL DEFAULT 0,
         diskon_total INTEGER NOT NULL DEFAULT 0,
         total INTEGER NOT NULL DEFAULT 0,
+        tanggal_pesanan TEXT NOT NULL DEFAULT '',
         created_at TEXT DEFAULT (datetime('now','localtime')),
         updated_at TEXT DEFAULT (datetime('now','localtime'))
       )`,
@@ -151,6 +152,11 @@ export async function initializeDatabase(
     if (!transactionColumns.rows.some((column) => String((column as Record<string, unknown>).name) === 'rincian_bayar')) {
       await db.execute("ALTER TABLE transactions ADD COLUMN rincian_bayar TEXT NOT NULL DEFAULT ''");
     }
+    const draftColumns = await db.execute('PRAGMA table_info(drafts)');
+    if (!draftColumns.rows.some((column) => String((column as Record<string, unknown>).name) === 'tanggal_pesanan')) {
+      await db.execute("ALTER TABLE drafts ADD COLUMN tanggal_pesanan TEXT NOT NULL DEFAULT ''");
+    }
+    await db.execute("UPDATE drafts SET tanggal_pesanan = COALESCE(NULLIF(substr(created_at,1,10),''), date('now','localtime')) WHERE tanggal_pesanan IS NULL OR tanggal_pesanan = ''");
     console.log("Tables OK.");
 
     // 2. Default Settings
@@ -440,11 +446,21 @@ export async function getTopProducts(tanggal?: string) {
 }
 
 // Drafts
+export function normalizeDraftDate(value: unknown): string {
+  const date = value === undefined || value === null || value === ''
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    : value;
+  if (typeof date !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('Tanggal pesanan harus menggunakan format YYYY-MM-DD.');
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new Error('Tanggal pesanan tidak valid.');
+  return date;
+}
+
 export async function addDraft(draft: any) {
   const db = getDb();
   return await db.execute({
-    sql: 'INSERT INTO drafts (nama_draft, items, subtotal, diskon_total, total) VALUES (?, ?, ?, ?, ?)',
-    args: [draft.nama_draft, draft.items, draft.subtotal, draft.diskon_total, draft.total]
+    sql: 'INSERT INTO drafts (nama_draft, items, subtotal, diskon_total, total, tanggal_pesanan) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [draft.nama_draft, draft.items, draft.subtotal, draft.diskon_total, draft.total, normalizeDraftDate(draft.tanggal_pesanan)]
   });
 }
 
@@ -474,8 +490,8 @@ export async function deleteDraft(id: number) {
 export async function updateDraft(id: number, draft: any) {
   const db = getDb();
   return await db.execute({
-    sql: 'UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?',
-    args: [draft.nama_draft, draft.items, draft.subtotal, draft.diskon_total, draft.total, id]
+    sql: 'UPDATE drafts SET nama_draft = ?, items = ?, subtotal = ?, diskon_total = ?, total = ?, tanggal_pesanan = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?',
+    args: [draft.nama_draft, draft.items, draft.subtotal, draft.diskon_total, draft.total, normalizeDraftDate(draft.tanggal_pesanan), id]
   });
 }
 
