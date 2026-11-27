@@ -829,7 +829,7 @@ export default function KasirPage() {
 
     function parseItems(s: string) { try { return JSON.parse(s); } catch { return []; } }
     function formatDraftDate(value?: string) {
-        if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return 'Tanggal belum ditentukan';
+        if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Tanggal belum ditentukan';
         const date = new Date(`${value}T00:00:00`);
         return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     }
