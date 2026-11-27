@@ -42,7 +42,7 @@ test('scoped API keys and external orders against a real libsql database', async
     await db.batch([
         'CREATE TABLE products (kode_barang TEXT PRIMARY KEY,nama_barang TEXT,harga_jual INTEGER,diskon INTEGER,tipe_diskon INTEGER,kategori TEXT,aktif INTEGER)',
         'CREATE TABLE settings (key TEXT PRIMARY KEY,value TEXT)',
-        'CREATE TABLE drafts (id INTEGER PRIMARY KEY AUTOINCREMENT,nama_draft TEXT,items TEXT,subtotal INTEGER,diskon_total INTEGER,total INTEGER,created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP)',
+        'CREATE TABLE drafts (id INTEGER PRIMARY KEY AUTOINCREMENT,nama_draft TEXT,items TEXT,subtotal INTEGER,diskon_total INTEGER,total INTEGER,tanggal_pesanan TEXT NOT NULL DEFAULT \'\',created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT DEFAULT CURRENT_TIMESTAMP)',
         'CREATE TABLE transactions (id TEXT PRIMARY KEY,tanggal TEXT,waktu TEXT,total INTEGER,metode_bayar TEXT,nama_pelanggan TEXT,items TEXT)',
         "INSERT INTO products VALUES ('TEA','Lemon Tea',15000,1000,1,'Minuman',1),('OFF','Nonaktif',10000,0,1,'Minuman',0)",
     ], 'write');
@@ -111,14 +111,15 @@ test('scoped API keys and external orders against a real libsql database', async
     await t.test('PUT replaces the existing reservation draft instead of creating a second draft', async () => {
         const original = (await db.execute('SELECT id FROM drafts LIMIT 1')).rows[0];
         assert.ok(original);
-        const changed = { source: 'booking', nama_pelanggan: 'ASDSA · 10/02 · INDOOR-SOFA · ADD70A22', items: [{ kode_barang: 'TEA', qty: 3, catatan: 'Extra ice' }] };
+        const changed = { source: 'booking', tanggal_pesanan: '2026-02-10', nama_pelanggan: 'ASDSA · 10/02 · INDOOR-SOFA · ADD70A22', items: [{ kode_barang: 'TEA', qty: 3, catatan: 'Extra ice' }] };
         const response = await orders.PUT(externalPut('orders', orderKey.token, changed));
         assert.equal(response.status, 200);
         const result = (await response.json()).data;
         assert.equal(result.updated, true);
         assert.equal(result.draft_id, Number(original.id));
-        const saved = (await db.execute({ sql: 'SELECT nama_draft,items FROM drafts WHERE id = ?', args: [original.id] })).rows[0];
+        const saved = (await db.execute({ sql: 'SELECT nama_draft,items,tanggal_pesanan FROM drafts WHERE id = ?', args: [original.id] })).rows[0];
         assert.equal(saved.nama_draft, 'BOOKING - ASDSA · 10/02 · INDOOR-SOFA · ADD70A22');
+        assert.equal(saved.tanggal_pesanan, '2026-02-10');
         const savedItems = JSON.parse(saved.items);
         assert.equal(savedItems.length, 1);
         assert.equal(savedItems[0].qty, 3);
@@ -156,6 +157,7 @@ test('scoped API keys and external orders against a real libsql database', async
             assert.equal((await orders.POST(external('orders', orderKey.token, { ...body, items: [{ kode_barang: 'TEA', qty }] }, 'order-invalid-0003'))).status, 400);
         }
         assert.equal((await orders.POST(external('orders', orderKey.token, { ...body, items: [{ kode_barang: 'OFF', qty: 1 }] }, 'order-off-0004'))).status, 409);
+        assert.equal((await orders.POST(external('orders', orderKey.token, { ...body, tanggal_pesanan: '2026-02-30' }, 'order-date-invalid-0005'))).status, 400);
         await db.execute("UPDATE settings SET value='2000-01-01' WHERE key='daily_unavailable_menu_date'");
         assert.equal((await orders.POST(external('orders', orderKey.token, body, 'order-blocked-0002'))).status, 201);
     });
